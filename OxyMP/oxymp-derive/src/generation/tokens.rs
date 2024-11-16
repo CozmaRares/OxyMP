@@ -18,6 +18,7 @@ pub fn generate_tokens(data: &MacroData) -> proc_macro2::TokenStream {
 
     let _Debug = get_def(Symbol::DeriveDebug, data.simple_types);
     let _Clone = get_def(Symbol::DeriveClone, data.simple_types);
+    let _TokenDebugInfo = get_def(Symbol::UtilTokenDebugInfo, data.simple_types);
 
     let structs = idents
         .clone()
@@ -38,7 +39,7 @@ pub fn generate_tokens(data: &MacroData) -> proc_macro2::TokenStream {
 
     let enum_entries = idents.map(|(enum_entry, struct_ident, _)| {
         quote! {
-            #enum_entry(#struct_ident)
+            #enum_entry(#struct_ident, #[cfg(debug_assertions)] #_TokenDebugInfo)
         }
     });
 

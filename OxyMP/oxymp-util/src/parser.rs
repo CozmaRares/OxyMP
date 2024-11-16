@@ -1,29 +1,21 @@
-use std::{ops::Deref, rc::Rc};
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
-pub struct ParserInput<Token>
-where
-    Token: Clone,
-{
+pub struct ParserInput<Token> {
     pub tokens: Rc<[Token]>,
     pub current: usize,
 }
-impl<Token, T> From<T> for ParserInput<Token>
-where
-    T: Deref<Target = [Token]>,
-    Token: Clone,
-{
-    fn from(tokens: T) -> ParserInput<Token> {
-        ParserInput {
-            tokens: tokens.deref().into(),
+
+impl<Token> From<Vec<Token>> for ParserInput<Token> {
+    fn from(value: Vec<Token>) -> Self {
+        Self {
+            tokens: value.into(),
             current: 0,
         }
     }
 }
-impl<Token> ParserInput<Token>
-where
-    Token: Clone,
-{
+
+impl<Token> ParserInput<Token> {
     pub fn get_current(&self) -> Option<&Token> {
         self.tokens.get(self.current)
     }

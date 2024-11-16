@@ -23,6 +23,7 @@ pub enum Symbol {
 
     UtilTokenMatcher,
     UtilTokenHandler,
+    UtilTokenDebugInfo,
     UtilLexRule,
     UtilLexer,
     UtilLexerBuilder,
@@ -54,11 +55,12 @@ lazy_static! {
 
         m.insert(Symbol::VecMacro,    (&["std"][..], "vec")   );
 
-        m.insert(Symbol::UtilTokenMatcher, (&["oxymp_util", "lexer"][..], "TokenMatcher"));
-        m.insert(Symbol::UtilTokenHandler, (&["oxymp_util", "lexer"][..], "TokenHandler"));
-        m.insert(Symbol::UtilLexRule,      (&["oxymp_util", "lexer"][..], "LexRule"     ));
-        m.insert(Symbol::UtilLexer,        (&["oxymp_util", "lexer"][..], "Lexer"       ));
-        m.insert(Symbol::UtilLexerBuilder, (&["oxymp_util", "lexer"][..], "LexerBuilder"));
+        m.insert(Symbol::UtilTokenMatcher,   (&["oxymp_util", "lexer"][..], "TokenMatcher"));
+        m.insert(Symbol::UtilTokenHandler,   (&["oxymp_util", "lexer"][..], "TokenHandler"));
+        m.insert(Symbol::UtilTokenDebugInfo, (&["oxymp_util", "lexer"][..], "TokenDebugInfo"));
+        m.insert(Symbol::UtilLexRule,        (&["oxymp_util", "lexer"][..], "LexRule"     ));
+        m.insert(Symbol::UtilLexer,          (&["oxymp_util", "lexer"][..], "Lexer"       ));
+        m.insert(Symbol::UtilLexerBuilder,   (&["oxymp_util", "lexer"][..], "LexerBuilder"));
 
         m.insert(Symbol::UtilParserInput,      (&["oxymp_util", "parser"][..], "ParserInput"));
         m.insert(Symbol::UtilParserState,      (&["oxymp_util", "parser"][..], "ParserState"));

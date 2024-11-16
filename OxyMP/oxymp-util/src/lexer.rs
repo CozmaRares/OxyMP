@@ -38,6 +38,10 @@ impl<'a> LexerState<'a> {
     pub fn current_n(&self, n: usize) -> &'a str {
         &self.input[self.cursor..self.cursor + n]
     }
+
+    pub fn current_offset(&self) -> usize {
+        self.cursor
+    }
 }
 
 type TokenCreatorFn<Token> = dyn Fn(&LexerState, usize) -> Token;
@@ -72,14 +76,27 @@ where
 {
     matcher: TokenMatcher,
     handler: TokenHandler<Token>,
+
+    #[cfg(debug_assertions)]
+    #[allow(dead_code)]
+    id: usize,
 }
 
 impl<Token> LexRule<Token>
 where
     Token: std::fmt::Debug,
 {
-    pub fn new(matcher: TokenMatcher, handler: TokenHandler<Token>) -> Self {
-        LexRule { matcher, handler }
+    pub fn new(
+        matcher: TokenMatcher,
+        handler: TokenHandler<Token>,
+        #[cfg(debug_assertions)] id: usize,
+    ) -> Self {
+        LexRule {
+            matcher,
+            handler,
+            #[cfg(debug_assertions)]
+            id,
+        }
     }
 
     fn matches(&self, state: &LexerState) -> Option<usize> {
@@ -218,4 +235,13 @@ where
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[cfg(debug_assertions)]
+#[derive(Debug, Clone)]
+pub struct TokenDebugInfo {
+    pub lex_rule: String,
+    pub offset: usize,
+    pub matched_size: usize,
+    pub matched_string: String,
 }

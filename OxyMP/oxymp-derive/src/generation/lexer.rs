@@ -15,7 +15,8 @@ pub fn generate_constructor(data: &MacroData) -> proc_macro2::TokenStream {
 
     let rules = token_info
         .iter()
-        .map(|tok| generate_rule(tok, data.simple_types));
+        .enumerate()
+        .map(|(idx, tok)| generate_rule(tok, data.simple_types, idx));
 
     let has_tier = rules.clone().any(|(tier, _rule)| tier.is_some());
 
@@ -53,11 +54,13 @@ pub fn generate_constructor(data: &MacroData) -> proc_macro2::TokenStream {
 fn generate_rule(
     tok: &TokenInfo,
     simple: bool,
+    id: usize,
 ) -> (&Option<proc_macro2::TokenStream>, proc_macro2::TokenStream) {
     let _Box = get_def(Symbol::Box, simple);
     let _LexRule = get_def(Symbol::UtilLexRule, simple);
     let _TokenHandler = get_def(Symbol::UtilTokenHandler, simple);
     let _TokenMatcher = get_def(Symbol::UtilTokenMatcher, simple);
+    let _TokenDebugInfo = get_def(Symbol::UtilTokenDebugInfo, simple);
 
     match tok {
         TokenInfo::Exact(ExactToken {
@@ -74,8 +77,17 @@ fn generate_rule(
                     #_LexRule::new(
                         #_TokenMatcher::Exact(#pattern.to_string()),
                         #_TokenHandler::Pattern(
-                            #_Box::new(|_, _| Token::#enum_ident(#struct_ident))
+                            #_Box::new(|state, matched_size| Token::#enum_ident(
+                                #struct_ident,
+                                #[cfg(debug_assertions)] #_TokenDebugInfo {
+                                    lex_rule: #name.to_string(),
+                                    offset: state.current_offset(),
+                                    matched_size,
+                                    matched_string: state.current_n(matched_size).to_string(),
+                                }
+                            ))
                         ),
+                        #[cfg(debug_assertions)] #id,
                     )
                 },
             )
@@ -99,9 +111,18 @@ fn generate_rule(
                             #_Box::new(
                                 |state, matched_size|
                                     #transformer_fn(state.current_n(matched_size))
-                                        .map(|t| Token::#enum_ident(#struct_ident(t)))
+                                        .map(|t| Token::#enum_ident(
+                                            #struct_ident(t),
+                                            #[cfg(debug_assertions)] #_TokenDebugInfo {
+                                                lex_rule: #name.to_string(),
+                                                offset: state.current_offset(),
+                                                matched_size,
+                                                matched_string: state.current_n(matched_size).to_string(),
+                                            }
+                                        ))
                             )
                         ),
+                        #[cfg(debug_assertions)] #id,
                     )
                 },
             )
@@ -112,6 +133,7 @@ fn generate_rule(
                 #_LexRule::new(
                     #_TokenMatcher::regex(#regex),
                     #_TokenHandler::Ignore,
+                    #[cfg(debug_assertions)] #id,
                 )
             },
         ),

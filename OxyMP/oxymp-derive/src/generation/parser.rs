@@ -105,7 +105,7 @@ fn expand_node(
                             expected: #_vec![#token_enum_entry_string.into()],
                         }
                     )),
-                    #_Some(Token::#token_enum_entry(tok)) =>
+                    #_Some(Token::#token_enum_entry(tok, ..)) =>
                         #_Ok((inp.increment(), tok.clone())),
                     #_Some(tok) => #_Err(#_ParseError::new (
                         #rule.into(),
@@ -323,7 +323,7 @@ fn generate_token_check(
         .tokens
         .iter()
         .map(|token| tokens::enum_ident(token))
-        .map(|ident| quote! { #_Some(Token::#ident(_)) => {} });
+        .map(|ident| quote! { #_Some(Token::#ident(..)) => {} });
 
     quote! {
         match inp.get_current() {
