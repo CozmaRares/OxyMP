@@ -140,6 +140,7 @@ dependencies = [
 name = "oxymp_tokens"
 version = "0.1.0"
 dependencies = [
+ "change-case",
  "proc-macro2",
  "quote",
  "syn",

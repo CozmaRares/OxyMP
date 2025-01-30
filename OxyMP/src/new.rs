@@ -21,14 +21,13 @@ pub fn match_ident(matched: &str) -> LexResult<String> {
 pub enum Tok {
     #[regex(
         r"\d+(.\d+)?",
-        type = i64,
-        fn = match_number,
+        transform = match_number,
         tier = DefaultTokenTier::High
     )]
-    Number,
+    Number(i64),
 
     #[exact("while")]
-    While,
+    While { a: i64 }, // testing purposes only
 
     #[exact("(")]
     ParenLeft,
@@ -42,8 +41,8 @@ pub enum Tok {
     #[exact("else")]
     Else,
 
-    #[regex("[a-z]+", type = String, fn = match_ident)]
-    Identifier,
+    #[regex("[a-z]+", transform = match_ident)]
+    Identifier(String),
 
     #[exact("=")]
     Equal,

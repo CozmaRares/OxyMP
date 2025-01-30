@@ -12,6 +12,9 @@ check:
 	done
 
 expand:
-	@FILE_NAME=src/oxy/$(shell date +"%Y-%m-%d-%H-%M").rs && \
+	@FILE_NAME=expand-$(shell date +"%Y-%m-%d-%H-%M").rs && \
 	cargo expand $(ARGS) > $$FILE_NAME && \
-	bat $$FILE_NAME
+	bat $$FILE_NAME && \
+	rm $$FILE_NAME
+
+.PHONY: all run trace check expand
