@@ -27,7 +27,7 @@ pub enum Tok {
     Number(i64),
 
     #[exact("while")]
-    While { a: i64 }, // testing purposes only
+    While,
 
     #[exact("(")]
     ParenLeft,

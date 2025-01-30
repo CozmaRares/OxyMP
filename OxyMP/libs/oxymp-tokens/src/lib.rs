@@ -1,5 +1,6 @@
 use change_case::snake_case;
 use quote::{format_ident, quote};
+use syn::spanned::Spanned;
 
 pub fn derive_tokens_impl(
     input: proc_macro2::TokenStream,
@@ -22,6 +23,8 @@ pub fn derive_tokens_impl(
             "Tokens can only be derived for enums",
         ));
     };
+
+    ensure_correct_variants(enum_data.variants.iter())?;
 
     let generated = enum_data
         .variants
@@ -47,15 +50,75 @@ pub fn derive_tokens_impl(
     })
 }
 
-// TODO: add check for fields based on the macro attribute
-// exact -> no fields (unit)
-// regex -> only 1 unnamed field
+// TODO: This is a bit of a hack, but it works for now
+// redo when generating the lex rules
+fn ensure_correct_variants(variants: syn::punctuated::Iter<syn::Variant>) -> syn::Result<()> {
+    for variant in variants {
+        let syn::Variant {
+            attrs,
+            ident,
+            fields,
+            ..
+        } = variant;
+
+        if attrs.is_empty() {
+            return Err(syn::Error::new(
+                ident.span(),
+                "Tokens can only be derived for enums with attributes",
+            ));
+        } else if attrs.len() > 1 {
+            return Err(syn::Error::new(
+                attrs[1].path().span(),
+                "Only one attribute is allowed",
+            ));
+        }
+
+        let attr_path = attrs[0].path();
+
+        if attr_path.is_ident("exact") {
+            match fields {
+                syn::Fields::Unit => {}
+                _ => {
+                    return Err(syn::Error::new(
+                        fields.span(),
+                        "Exact tokens can't contain any fields",
+                    ))
+                }
+            }
+        } else if attr_path.is_ident("regex") {
+            match fields {
+                syn::Fields::Unnamed(fields_unnamed) => {
+                    if fields_unnamed.unnamed.len() != 1 {
+                        return Err(syn::Error::new(
+                            fields.span(),
+                            "Regex tokens can only contain one unnamed field",
+                        ));
+                    }
+                }
+                syn::Fields::Named(_) => {
+                    return Err(syn::Error::new(
+                        fields.span(),
+                        "Regex tokens can only contain one unnamed field",
+                    ))
+                }
+                syn::Fields::Unit => {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        "Regex tokens can only contain one unnamed field",
+                    ))
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
 
 fn generate_token_struct(ident: &syn::Ident, fields: &syn::Fields) -> proc_macro2::TokenStream {
     match fields {
-        syn::Fields::Named(fields_named) => quote! { struct #ident #fields_named },
         syn::Fields::Unnamed(fields_unnamed) => quote! { struct #ident #fields_unnamed; },
         syn::Fields::Unit => quote! { struct #ident; },
+        syn::Fields::Named(_) => unreachable!(),
     }
 }
 
@@ -65,17 +128,6 @@ fn generate_token_struct_impl(
     fields: &syn::Fields,
 ) -> proc_macro2::TokenStream {
     let check = match fields {
-        syn::Fields::Named(fields_named) => {
-            let field_names = fields_named
-                .named
-                .iter()
-                .filter_map(|field| field.ident.clone());
-            let field_names = quote! { #(#field_names),* };
-
-            quote! {
-                #original_ident::#ident { #field_names } => Some(Self { #field_names }),
-            }
-        }
         syn::Fields::Unnamed(fields_unnamed) => {
             let field_names = fields_unnamed
                 .unnamed
@@ -91,6 +143,8 @@ fn generate_token_struct_impl(
         syn::Fields::Unit => quote! {
             #original_ident::#ident => Some(Self),
         },
+
+        syn::Fields::Named(_) => unreachable!(),
     };
 
     quote! {
