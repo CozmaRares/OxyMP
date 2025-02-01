@@ -21,10 +21,10 @@ pub fn match_ident(matched: &str) -> LexResult<String> {
 pub enum Tok {
     #[regex(
         r"\d+(.\d+)?",
-        transform = match_number,
-        tier = DefaultTokenTier::High
+        transform = match_number
+        //tier = DefaultTokenTier::High
     )]
-    Number(i64),
+    Number { value: i64 },
 
     #[exact("while")]
     While,
