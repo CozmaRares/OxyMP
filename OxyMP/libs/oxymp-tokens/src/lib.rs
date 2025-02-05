@@ -30,9 +30,7 @@ pub fn derive_tokens_impl(
         ));
     };
 
-    let info = get_token_info(&enum_data.variants);
-
-    eprintln!("{:#?}", info);
+    let info = get_token_info(&enum_data.variants)?;
 
     let generated = enum_data
         .variants

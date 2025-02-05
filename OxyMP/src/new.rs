@@ -5,13 +5,16 @@ use oxymp_util::lexer::{LexError, LexResult};
 
 use std::num::ParseIntError;
 
-pub fn match_number(matched: &str) -> LexResult<i64> {
-    matched.parse().map_err(|_| LexError::unparsable(matched))
+pub fn match_number(matched: &str) -> LexResult<Tok> {
+    matched
+        .parse()
+        .map_err(|_| LexError::unparsable(matched))
+        .map(|v| Tok::Number { value: v })
 }
 
-pub fn match_ident(matched: &str) -> LexResult<String> {
+pub fn match_ident(matched: &str) -> LexResult<Tok> {
     if matched.len() == 1 {
-        Ok(matched.to_string())
+        Ok(Tok::Identifier(matched.to_string()))
     } else {
         Err(LexError::unparsable(matched))
     }
@@ -19,11 +22,7 @@ pub fn match_ident(matched: &str) -> LexResult<String> {
 
 #[derive(Tokens)]
 pub enum Tok {
-    #[regex(
-        r"\d+(.\d+)?",
-        transform = match_number
-        //tier = DefaultTokenTier::High
-    )]
+    #[regex(r"\d+(.\d+)?", transform = match_number)]
     Number { value: i64 },
 
     #[exact("while")]

@@ -1,23 +1,11 @@
 #[derive(Debug)]
 pub struct ExactToken {
     pub pattern: String,
-    // TODO:
-    // tier: Option<proc_macro2::TokenStream>,
 }
 
 impl syn::parse::Parse for ExactToken {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<ExactToken> {
         let pattern: syn::LitStr = input.parse()?;
-
-        // optional last comma
-        let lookahead = input.lookahead1();
-        if lookahead.peek(syn::Token![,]) {
-            input.parse::<syn::Token![,]>()?;
-        }
-
-        if !input.is_empty() {
-            return Err(syn::Error::new(input.span(), "Unexpected remaining tokens"));
-        }
 
         Ok(ExactToken {
             pattern: pattern.value(),
@@ -29,8 +17,6 @@ impl syn::parse::Parse for ExactToken {
 pub struct RegexToken {
     pub regex: String,
     pub transformer: syn::Path,
-    // TODO:
-    //tier: Option<proc_macro2::TokenStream>,
 }
 
 impl syn::parse::Parse for RegexToken {
@@ -47,16 +33,6 @@ impl syn::parse::Parse for RegexToken {
         }
         let _eq: syn::Token![=] = input.parse()?;
         let transform_path: syn::Path = input.parse()?;
-
-        // optional last comma
-        let lookahead = input.lookahead1();
-        if lookahead.peek(syn::Token![,]) {
-            input.parse::<syn::Token![,]>()?;
-        }
-
-        if !input.is_empty() {
-            return Err(syn::Error::new(input.span(), "Unexpected remaining tokens"));
-        }
 
         Ok(RegexToken {
             regex: regex.value(),
@@ -89,10 +65,25 @@ impl syn::parse::Parse for TokenInfo {
         let content_parenthesized;
         let _parenthesized = syn::parenthesized!(content_parenthesized in content_bracketed);
 
-        match branch {
+        let info = match branch {
             1 => content_parenthesized.parse().map(TokenInfo::Exact),
             2 => content_parenthesized.parse().map(TokenInfo::Regex),
             _ => unreachable!(),
+        }?;
+
+        // optional last comma
+        let lookahead = content_parenthesized.lookahead1();
+        if lookahead.peek(syn::Token![,]) {
+            content_parenthesized.parse::<syn::Token![,]>()?;
         }
+
+        if !content_parenthesized.is_empty() {
+            return Err(syn::Error::new(
+                content_parenthesized.span(),
+                "Unexpected remaining tokens",
+            ));
+        }
+
+        Ok(info)
     }
 }
