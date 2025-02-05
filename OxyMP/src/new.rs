@@ -1,9 +1,5 @@
-#![allow(unused)]
-
-use oxymp_new::{Lexer, RDParser, Tokens};
-use oxymp_util::lexer::*;
-
-use std::num::ParseIntError;
+use oxymp::{Lexer, RDParser, Tokens};
+use oxymp_util::lexer::{LexError, LexResult};
 
 pub fn match_number(matched: &str) -> LexResult<Tok> {
     matched
@@ -50,10 +46,10 @@ pub enum Tok {
     Plus,
 }
 
-//#[derive(Lexer)]
-//#[tokens(Tok)]
-//#[skip(regex = r"\s+")]
-//pub struct Lexer;
+#[derive(Lexer)]
+#[tokens(Tok)]
+#[skip(regex = r"\s+")]
+pub struct Lexer;
 //
 //#[derive(RDParser)]
 //#[tokens(Tok)]

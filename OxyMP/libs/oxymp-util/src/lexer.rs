@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use regex::Regex;
 
 pub enum TokenMatcher {
@@ -51,14 +49,12 @@ pub enum TokenHandler<Token> {
     Ignore,
 }
 
-pub struct LexRule<Token>
-{
+pub struct LexRule<Token> {
     matcher: TokenMatcher,
     handler: TokenHandler<Token>,
 }
 
-impl<Token> LexRule<Token>
-{
+impl<Token> LexRule<Token> {
     pub fn new(matcher: TokenMatcher, handler: TokenHandler<Token>) -> Self {
         LexRule { matcher, handler }
     }
@@ -85,6 +81,7 @@ impl<Token> LexRule<Token>
     }
 }
 
+#[derive(Debug)]
 pub enum LexError {
     UnknownPattern(String),
     UnparsableToken(String),
@@ -100,15 +97,24 @@ impl LexError {
     }
 }
 
+impl std::fmt::Display for LexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LexError::UnknownPattern(input) => write!(f, "Unknown pattern: {}", input),
+            LexError::UnparsableToken(input) => write!(f, "Unparsable token: {}", input),
+        }
+    }
+}
+
+impl std::error::Error for LexError {}
+
 pub type LexResult<T> = Result<T, LexError>;
 
-pub struct Lexer<Token>
-{
+pub struct Lexer<Token> {
     pub rules: Vec<LexRule<Token>>,
 }
 
-impl<Token> Lexer<Token>
-{
+impl<Token> Lexer<Token> {
     pub fn tokenize<'a>(&'a self, input: &'a str) -> Result<Vec<Token>, LexError> {
         let mut tokens = Vec::new();
         let mut state = LexerState { input, cursor: 0 };
@@ -136,59 +142,6 @@ impl<Token> Lexer<Token>
             }
         }
         Ok(tokens)
-    }
-}
-
-#[derive(Ord, Eq, PartialEq, PartialOrd, Default, Hash)]
-pub enum DefaultTokenTier {
-    High,
-    Medium,
-    #[default]
-    Low,
-}
-
-pub struct LexerBuilder<Token, Tier = DefaultTokenTier>
-where
-    Tier: std::hash::Hash + Ord + Default,
-{
-    rules: HashMap<Tier, Vec<LexRule<Token>>>,
-}
-
-impl<Token, Tier> LexerBuilder<Token, Tier>
-where
-    Tier: std::hash::Hash + Ord + Default,
-{
-    pub fn new() -> Self {
-        Self {
-            rules: HashMap::new(),
-        }
-    }
-
-    pub fn add_rule(&mut self, rule: LexRule<Token>) {
-        let tier = Tier::default();
-        self.rules.entry(tier).or_default().extend(vec![rule]);
-    }
-
-    pub fn add_tiered_rule(&mut self, tier: Tier, rule: LexRule<Token>) {
-        self.rules.entry(tier).or_default().extend(vec![rule]);
-    }
-
-    pub fn build(self) -> Lexer<Token> {
-        let mut rules: Vec<_> = self.rules.into_iter().collect();
-        rules.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
-
-        let rules = rules.into_iter().flat_map(|(_, rules)| rules).collect();
-
-        Lexer { rules }
-    }
-}
-
-impl<Token, Tier> Default for LexerBuilder<Token, Tier>
-where
-    Tier: std::hash::Hash + Ord + Default,
-{
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-oxymp = { version = "0.1.0", path = "oxymp-derive" }
 regex = "1.10.6"
-oxymp_util = { version = "0.1.0", path = "oxymp-util" }
-oxymp_new = { version = "0.1.0", path = "libs/oxymp", features = ["full"] }
+oxymp = { version = "0.1.0", path = "libs/oxymp", features = ["full"] }
+oxymp_util = { version = "0.1.0", path = "libs/oxymp-util" }

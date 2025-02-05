@@ -221,7 +221,7 @@ fn generate_lex_rules(
 
     quote! {
         impl #ident {
-            fn make_lex_rules() -> Vec<LexRule<#ident>> {
+            fn make_lex_rules() -> Vec<::oxymp_util::lexer::LexRule<Self>> {
                 vec![ #(#rules),* ]
             }
         }
@@ -237,21 +237,21 @@ fn generate_rule(
 
     match token_info {
         TokenInfo::Exact(ExactToken { pattern }) => quote! {
-           LexRule::new(
-               TokenMatcher::Exact(#pattern.to_string()),
-               TokenHandler::Pattern(Box::new(|_, _| #token_ident::#variant)),
+           ::oxymp_util::lexer::LexRule::new(
+               ::oxymp_util::lexer::TokenMatcher::Exact(#pattern.to_string()),
+               ::oxymp_util::lexer::TokenHandler::Pattern(Box::new(|_, _| #token_ident::#variant)),
            )
         },
         TokenInfo::Regex(RegexToken { regex, transformer }) => quote! {
-            LexRule::new(
-                TokenMatcher::regex(#regex),
-                TokenHandler::Regex(
-                    Box::new(
-                        |state, matched_size|
-                            #transformer(state.current_n(matched_size))
-                    )
-                )
-            )
-        },
+            ::oxymp_util::lexer::LexRule::new(
+                ::oxymp_util::lexer::TokenMatcher::regex(#regex),
+                ::oxymp_util::lexer::TokenHandler::Regex(
+                       ::std::boxed::Box::new(
+                               |state, matched_size|
+                                   #transformer(state.current_n(matched_size))
+                           )
+                       )
+                   )
+               },
     }
 }
