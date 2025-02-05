@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use oxymp_new::{Lexer, RDParser, Tokens};
-use oxymp_util::lexer::{LexError, LexResult};
+use oxymp_util::lexer::*;
 
 use std::num::ParseIntError;
 

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use regex::Regex;
 
-#[derive(Debug)]
 pub enum TokenMatcher {
     Exact(String),
     Regex(Regex),
@@ -16,7 +15,6 @@ impl TokenMatcher {
     }
 }
 
-#[derive(Debug)]
 pub struct LexerState<'a> {
     input: &'a str,
     cursor: usize,
@@ -47,56 +45,22 @@ impl<'a> LexerState<'a> {
 type TokenCreatorFn<Token> = dyn Fn(&LexerState, usize) -> Token;
 type TokenTransformerFn<Token> = dyn Fn(&LexerState, usize) -> Result<Token, LexError>;
 
-pub enum TokenHandler<Token>
-where
-    Token: std::fmt::Debug,
-{
+pub enum TokenHandler<Token> {
     Pattern(Box<TokenCreatorFn<Token>>),
     Regex(Box<TokenTransformerFn<Token>>),
     Ignore,
 }
 
-impl<Token> std::fmt::Debug for TokenHandler<Token>
-where
-    Token: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TokenHandler::Pattern(_) => f.debug_tuple("Pattern").finish(),
-            TokenHandler::Regex(_) => f.debug_tuple("Regex").finish(),
-            TokenHandler::Ignore => f.debug_tuple("Ignore").finish(),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct LexRule<Token>
-where
-    Token: std::fmt::Debug,
 {
     matcher: TokenMatcher,
     handler: TokenHandler<Token>,
-
-    #[cfg(debug_assertions)]
-    #[allow(dead_code)]
-    id: usize,
 }
 
 impl<Token> LexRule<Token>
-where
-    Token: std::fmt::Debug,
 {
-    pub fn new(
-        matcher: TokenMatcher,
-        handler: TokenHandler<Token>,
-        #[cfg(debug_assertions)] id: usize,
-    ) -> Self {
-        LexRule {
-            matcher,
-            handler,
-            #[cfg(debug_assertions)]
-            id,
-        }
+    pub fn new(matcher: TokenMatcher, handler: TokenHandler<Token>) -> Self {
+        LexRule { matcher, handler }
     }
 
     fn matches(&self, state: &LexerState) -> Option<usize> {
@@ -121,7 +85,6 @@ where
     }
 }
 
-#[derive(Debug)]
 pub enum LexError {
     UnknownPattern(String),
     UnparsableToken(String),
@@ -139,17 +102,12 @@ impl LexError {
 
 pub type LexResult<T> = Result<T, LexError>;
 
-#[derive(Debug)]
 pub struct Lexer<Token>
-where
-    Token: std::fmt::Debug,
 {
     pub rules: Vec<LexRule<Token>>,
 }
 
 impl<Token> Lexer<Token>
-where
-    Token: std::fmt::Debug,
 {
     pub fn tokenize<'a>(&'a self, input: &'a str) -> Result<Vec<Token>, LexError> {
         let mut tokens = Vec::new();
@@ -191,7 +149,6 @@ pub enum DefaultTokenTier {
 
 pub struct LexerBuilder<Token, Tier = DefaultTokenTier>
 where
-    Token: std::fmt::Debug,
     Tier: std::hash::Hash + Ord + Default,
 {
     rules: HashMap<Tier, Vec<LexRule<Token>>>,
@@ -199,7 +156,6 @@ where
 
 impl<Token, Tier> LexerBuilder<Token, Tier>
 where
-    Token: std::fmt::Debug,
     Tier: std::hash::Hash + Ord + Default,
 {
     pub fn new() -> Self {
@@ -229,7 +185,6 @@ where
 
 impl<Token, Tier> Default for LexerBuilder<Token, Tier>
 where
-    Token: std::fmt::Debug,
     Tier: std::hash::Hash + Ord + Default,
 {
     fn default() -> Self {
@@ -240,8 +195,8 @@ where
 #[cfg(debug_assertions)]
 #[derive(Debug, Clone)]
 pub struct TokenDebugInfo {
-    pub lex_rule: String,
-    pub offset: usize,
+    pub inpup_offset: usize,
+    pub matched_rule: String,
+    pub matched: String,
     pub matched_size: usize,
-    pub matched_string: String,
 }

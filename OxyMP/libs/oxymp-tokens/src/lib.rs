@@ -6,7 +6,8 @@ use syn::spanned::Spanned;
 
 use info::*;
 
-// TODO:add user guidance for error messages
+// TODO: add user guidance for error messages
+// TODO: add token debug info
 
 pub fn derive_tokens_impl(
     input: proc_macro2::TokenStream,
@@ -30,8 +31,6 @@ pub fn derive_tokens_impl(
         ));
     };
 
-    let info = get_token_info(&enum_data.variants)?;
-
     let generated = enum_data
         .variants
         .iter()
@@ -45,12 +44,17 @@ pub fn derive_tokens_impl(
             }
         });
 
+    let info = get_token_info(&enum_data.variants)?;
+    let lex_rules = generate_lex_rules(&ast.ident, info);
+
     Ok(quote! {
         mod #mod_ident {
             use super::*;
 
             #(#generated)*
         }
+
+        #lex_rules
     })
 }
 
@@ -205,4 +209,49 @@ fn get_token_info(
     }
 
     Ok(info)
+}
+
+fn generate_lex_rules(
+    ident: &syn::Ident,
+    info: Vec<(String, TokenInfo)>,
+) -> proc_macro2::TokenStream {
+    let rules = info
+        .into_iter()
+        .map(|(variant, info)| generate_rule(ident, variant, info));
+
+    quote! {
+        impl #ident {
+            fn make_lex_rules() -> Vec<LexRule<#ident>> {
+                vec![ #(#rules),* ]
+            }
+        }
+    }
+}
+
+fn generate_rule(
+    token_ident: &syn::Ident,
+    token_variant: String,
+    token_info: TokenInfo,
+) -> proc_macro2::TokenStream {
+    let variant = format_ident!("{}", token_variant);
+
+    match token_info {
+        TokenInfo::Exact(ExactToken { pattern }) => quote! {
+           LexRule::new(
+               TokenMatcher::Exact(#pattern.to_string()),
+               TokenHandler::Pattern(Box::new(|_, _| #token_ident::#variant)),
+           )
+        },
+        TokenInfo::Regex(RegexToken { regex, transformer }) => quote! {
+            LexRule::new(
+                TokenMatcher::regex(#regex),
+                TokenHandler::Regex(
+                    Box::new(
+                        |state, matched_size|
+                            #transformer(state.current_n(matched_size))
+                    )
+                )
+            )
+        },
+    }
 }
