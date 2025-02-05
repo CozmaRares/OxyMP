@@ -48,7 +48,7 @@ pub enum Tok {
 
 #[derive(Lexer)]
 #[tokens(Tok)]
-#[skip(regex = r"\s+")]
+#[skip(r"\s+")]
 pub struct Lexer;
 //
 //#[derive(RDParser)]
