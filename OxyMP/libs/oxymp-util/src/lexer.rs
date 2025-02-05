@@ -1,18 +1,5 @@
 use regex::Regex;
 
-pub enum TokenMatcher {
-    Exact(String),
-    Regex(Regex),
-}
-
-impl TokenMatcher {
-    pub fn regex(re: &str) -> TokenMatcher {
-        let re = format!("^{re}");
-        let re = Regex::new(&re).unwrap();
-        TokenMatcher::Regex(re)
-    }
-}
-
 pub struct LexerState<'a> {
     input: &'a str,
     cursor: usize,
@@ -40,43 +27,48 @@ impl<'a> LexerState<'a> {
     }
 }
 
-type TokenCreatorFn<Token> = dyn Fn(&LexerState, usize) -> Token;
-type TokenTransformerFn<Token> = dyn Fn(&LexerState, usize) -> Result<Token, LexError>;
+type TokenCreatorFn<Token> = dyn Fn() -> Token;
+type TokenTransformerFn<Token> = dyn Fn(&LexerState, usize) -> LexResult<Token>;
 
-pub enum TokenHandler<Token> {
-    Pattern(Box<TokenCreatorFn<Token>>),
-    Regex(Box<TokenTransformerFn<Token>>),
-    Ignore,
-}
-
-pub struct LexRule<Token> {
-    matcher: TokenMatcher,
-    handler: TokenHandler<Token>,
+pub enum LexRule<Token> {
+    Exact {
+        pattern: String,
+        handler: Box<TokenCreatorFn<Token>>,
+    },
+    Regex {
+        regex: Regex,
+        handler: Box<TokenTransformerFn<Token>>,
+    },
 }
 
 impl<Token> LexRule<Token> {
-    pub fn new(matcher: TokenMatcher, handler: TokenHandler<Token>) -> Self {
-        LexRule { matcher, handler }
+    pub fn new_exact(pattern: String, handler: Box<TokenCreatorFn<Token>>) -> Self {
+        LexRule::Exact { pattern, handler }
+    }
+
+    pub fn new_regex(regex: &str, handler: Box<TokenTransformerFn<Token>>) -> Self {
+        let re = format!("^{regex}");
+        let re = Regex::new(&re).unwrap();
+        LexRule::Regex { regex: re, handler }
     }
 
     fn matches(&self, state: &LexerState) -> Option<usize> {
-        match &self.matcher {
-            TokenMatcher::Exact(exact_match) => state
+        match &self {
+            LexRule::Exact { pattern, .. } => state
                 .remaining()
-                .starts_with(exact_match)
-                .then_some(exact_match.len()),
-            TokenMatcher::Regex(re) => re
+                .starts_with(pattern)
+                .then_some(pattern.len()),
+            LexRule::Regex { regex, .. } => regex
                 .captures(state.remaining())
                 .and_then(|captures| captures.get(0))
                 .map(|matched| matched.end() - matched.start()),
         }
     }
 
-    fn consume(&self, state: &LexerState, matched_size: usize) -> Result<Option<Token>, LexError> {
-        match &self.handler {
-            TokenHandler::Ignore => Ok(None),
-            TokenHandler::Pattern(f) => Ok(Some(f(state, matched_size))),
-            TokenHandler::Regex(f) => f(state, matched_size).map(|t| Some(t)),
+    fn consume(&self, state: &LexerState, matched_size: usize) -> LexResult<Token> {
+        match &self {
+            LexRule::Exact { handler, .. } => Ok(handler()),
+            LexRule::Regex { handler, .. } => handler(state, matched_size),
         }
     }
 }
@@ -115,7 +107,7 @@ pub struct Lexer<Token> {
 }
 
 impl<Token> Lexer<Token> {
-    pub fn tokenize<'a>(&'a self, input: &'a str) -> Result<Vec<Token>, LexError> {
+    pub fn tokenize<'a>(&'a self, input: &'a str) -> LexResult<Vec<Token>> {
         let mut tokens = Vec::new();
         let mut state = LexerState { input, cursor: 0 };
 
@@ -128,10 +120,8 @@ impl<Token> Lexer<Token> {
                     Some(size) => size,
                 };
 
-                if let Ok(result) = rule.consume(&state, matched_size) {
-                    if let Some(token) = result {
-                        tokens.push(token);
-                    }
+                if let Ok(token) = rule.consume(&state, matched_size) {
+                    tokens.push(token);
                     was_consumed = true;
                     state.advance(matched_size);
                     break;

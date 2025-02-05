@@ -237,21 +237,18 @@ fn generate_rule(
 
     match token_info {
         TokenInfo::Exact(ExactToken { pattern }) => quote! {
-           ::oxymp_util::lexer::LexRule::new(
-               ::oxymp_util::lexer::TokenMatcher::Exact(#pattern.to_string()),
-               ::oxymp_util::lexer::TokenHandler::Pattern(Box::new(|_, _| #token_ident::#variant)),
+           ::oxymp_util::lexer::LexRule::new_exact(
+               #pattern.to_string(),
+               std::boxed::Box::new(|| #token_ident::#variant),
            )
         },
         TokenInfo::Regex(RegexToken { regex, transformer }) => quote! {
-            ::oxymp_util::lexer::LexRule::new(
-                ::oxymp_util::lexer::TokenMatcher::regex(#regex),
-                ::oxymp_util::lexer::TokenHandler::Regex(
-                       ::std::boxed::Box::new(
-                               |state, matched_size|
-                                   #transformer(state.current_n(matched_size))
-                           )
-                       )
-                   )
-               },
+            ::oxymp_util::lexer::LexRule::new_regex(
+                #regex,
+               ::std::boxed::Box::new(
+                   |state, matched_size| #transformer(state.current_n(matched_size))
+               )
+            )
+        },
     }
 }
