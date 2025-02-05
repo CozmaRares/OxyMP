@@ -27,7 +27,7 @@ pub fn derive_tokens_impl(
 
         return Err(syn::Error::new(
             ds_keyword_span,
-            "Tokens can only be derived for enums",
+            "Tokens can only be derived for enums. Make sure that #[derive(Tokens)] is applied to an enum.",
         ));
     };
 
@@ -130,7 +130,7 @@ enum AttributeError {
 
 #[inline]
 fn get_token_type(
-    attrs: &Vec<syn::Attribute>,
+    attrs: &[syn::Attribute],
 ) -> Result<(TokenType, &syn::Attribute), AttributeError> {
     if attrs.is_empty() {
         return Err(AttributeError::Empty);
@@ -159,12 +159,12 @@ fn ensure_correct_attribute(
         (TokenType::Exact, syn::Fields::Unit) => Ok(()),
         (TokenType::Exact, _) => Err(syn::Error::new(
             fields.span(),
-            "Exact tokens can't contain any fields. Consider removing any associated data for this token type.",
+            "Exact tokens can't contain any data. Consider removing any associated data for this token variant.",
         )),
 
         (TokenType::Regex, syn::Fields::Unit) => Err(syn::Error::new(
             ident.span(),
-            "Regex tokens must encapsulate data. Ensure that the token definition includes the necessary fields."
+            "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
         )),
         (TokenType::Regex, _) => Ok(()),
     }
@@ -190,13 +190,13 @@ fn get_token_info(
             return match err {
                 AttributeError::Empty => Err(syn::Error::new(
                     ident.span(),
-                    "Tokens can only be derived for enums with attributes",
+                    "Tokens can only be derived form variants with attributes. Please annotate the variant with `#[exact(\"...\")]` or `#[regex(\"...\", transform = ...)]`.",
                 )),
                 AttributeError::MoreThan1(span) => {
-                    Err(syn::Error::new(span, "Only one attribute is allowed"))
+                    Err(syn::Error::new(span, "Only one attribute is allowed. Consider using only one attribute or creating another variant."))
                 }
                 AttributeError::InvalidAttribute(span) => {
-                    Err(syn::Error::new(span, "Unhandled attribute"))
+                    Err(syn::Error::new(span, "This attribute is not handled. This is a bug. Please report it."))
                 }
             };
         };

@@ -19,16 +19,18 @@ pub struct RegexToken {
     pub transformer: syn::Path,
 }
 
+const TRANSFORMER_NAME: &str = "transform";
+
 impl syn::parse::Parse for RegexToken {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<RegexToken> {
         let regex: syn::LitStr = input.parse()?;
         let _comma: syn::Token![,] = input.parse()?;
 
         let transform_ident: syn::Ident = input.parse()?;
-        if transform_ident != "transform" {
+        if transform_ident != TRANSFORMER_NAME {
             return Err(syn::Error::new(
                 transform_ident.span(),
-                "Expected `transform` as the transformer identifier",
+                format!("Expected `{TRANSFORMER_NAME}` as the transformer identifier",),
             ));
         }
         let _eq: syn::Token![=] = input.parse()?;
@@ -59,7 +61,12 @@ impl syn::parse::Parse for TokenInfo {
         let branch = match ident.to_string().as_str() {
             "exact" => 1,
             "regex" => 2,
-            _ => return Err(syn::Error::new(ident.span(), "Unknown token type")),
+            _ => {
+                return Err(syn::Error::new(
+                    ident.span(),
+                    "Unknown token type. This is a bug. Please report it.",
+                ))
+            }
         };
 
         let content_parenthesized;
@@ -80,7 +87,7 @@ impl syn::parse::Parse for TokenInfo {
         if !content_parenthesized.is_empty() {
             return Err(syn::Error::new(
                 content_parenthesized.span(),
-                "Unexpected remaining tokens",
+                "Unexpected tokens. Please remove them.",
             ));
         }
 
