@@ -1,7 +1,7 @@
 mod info;
 
 use change_case::snake_case;
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use syn::spanned::Spanned;
 
 use info::*;
@@ -203,7 +203,10 @@ fn get_token_info(
 
         ensure_correct_attribute(&token_type, fields, ident)?;
 
-        let token_info: TokenInfo = syn::parse2(attr.to_token_stream())?;
+        let token_info = match token_type {
+            TokenType::Exact => TokenInfo::Exact(attr.parse_args()?),
+            TokenType::Regex => TokenInfo::Regex(attr.parse_args()?),
+        };
 
         info.push((ident.to_string(), token_info));
     }
