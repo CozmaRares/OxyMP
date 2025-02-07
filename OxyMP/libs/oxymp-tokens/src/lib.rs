@@ -1,6 +1,7 @@
 mod info;
 
 use change_case::snake_case;
+use oxymp_macro_utils::AttributeParseError;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
 
@@ -8,6 +9,8 @@ use info::*;
 
 // TODO: add user guidance for error messages
 // TODO: add token debug info
+
+const DERIVE_ATTRIBUTE: &str = "#[derive(Tokens)]";
 
 pub fn derive_tokens_impl(
     input: proc_macro2::TokenStream,
@@ -27,9 +30,23 @@ pub fn derive_tokens_impl(
 
         return Err(syn::Error::new(
             ds_keyword_span,
-            "Tokens can only be derived for enums. Make sure that #[derive(Tokens)] is applied to an enum.",
+            format!(
+                "Tokens can only be derived for enums. Make sure that `{}` is applied to an enum.",
+                DERIVE_ATTRIBUTE
+            ),
         ));
     };
+
+    if enum_data.variants.is_empty() {
+        return Err(syn::Error::new(
+            ast.ident.span(),
+            format!(
+                "The token enum must contain at least one variant. Consider adding a variant with `{}` or `{}`.",
+                EXACT_TOKEN_FORMAT,
+                REGEX_TOKEN_FORMAT,
+            )
+        ));
+    }
 
     let generated = enum_data
         .variants
@@ -170,6 +187,15 @@ fn ensure_correct_attribute(
     }
 }
 
+fn add_correct_format(format: &'static str) -> impl FnOnce(syn::Error) -> syn::Error {
+    |err| {
+        let span = err.span();
+        let reason = err.to_string();
+
+        AttributeParseError::new(span, reason, format).into()
+    }
+}
+
 fn get_token_info(
     variants: &syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>,
 ) -> syn::Result<Vec<(String, TokenInfo)>> {
@@ -190,13 +216,23 @@ fn get_token_info(
             return match err {
                 AttributeError::Empty => Err(syn::Error::new(
                     ident.span(),
-                    "Tokens can only be derived form variants with attributes. Please annotate the variant with `#[exact(\"...\")]` or `#[regex(\"...\", transform = ...)]`.",
+                    format!(
+                        "Tokens can only be derived form variants with attributes. Please annotate the variant with `{}` or `{}`.",
+                        EXACT_TOKEN_FORMAT,
+                        REGEX_TOKEN_FORMAT,
+                    )
                 )),
                 AttributeError::MoreThan1(span) => {
                     Err(syn::Error::new(span, "Only one attribute is allowed. Consider using only one attribute or creating another variant."))
                 }
                 AttributeError::InvalidAttribute(span) => {
-                    Err(syn::Error::new(span, "This attribute is not handled. This is a bug. Please report it."))
+                    Err(syn::Error::new(span,
+                    format!(
+                        "The use of this attribute is not allowed. Please annotate the variant with `{}` or `{}`.",
+                        EXACT_TOKEN_FORMAT,
+                        REGEX_TOKEN_FORMAT,
+                    )
+                    ))
                 }
             };
         };
@@ -204,8 +240,14 @@ fn get_token_info(
         ensure_correct_attribute(&token_type, fields, ident)?;
 
         let token_info = match token_type {
-            TokenType::Exact => TokenInfo::Exact(attr.parse_args()?),
-            TokenType::Regex => TokenInfo::Regex(attr.parse_args()?),
+            TokenType::Exact => TokenInfo::Exact(
+                attr.parse_args()
+                    .map_err(add_correct_format(EXACT_TOKEN_FORMAT))?,
+            ),
+            TokenType::Regex => TokenInfo::Regex(
+                attr.parse_args()
+                    .map_err(add_correct_format(REGEX_TOKEN_FORMAT))?,
+            ),
         };
 
         info.push((ident.to_string(), token_info));

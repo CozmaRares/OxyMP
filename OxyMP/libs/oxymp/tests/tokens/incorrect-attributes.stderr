@@ -1,0 +1,101 @@
+error: Expected `,`. Correct format is #[regex("your regex", path::to::function)].
+ --> tests/tokens/incorrect-attributes.rs:9:26
+  |
+9 |     #[regex(r"\d+(.\d+)?")]
+  |                          ^
+
+error: Expected `,`. Correct format is #[regex("your regex", path::to::function)].
+  --> tests/tokens/incorrect-attributes.rs:23:27
+   |
+23 |     #[regex(r"\d+(.\d+)?" match_number2)]
+   |                           ^^^^^^^^^^^^^
+
+error: Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens. Correct format is #[regex("your regex", path::to::function)].
+  --> tests/tokens/incorrect-attributes.rs:37:41
+   |
+37 |     #[regex(r"\d+(.\d+)?", match_number3, aaa)]
+   |                                         ^
+
+error: Expected string literal. Correct format is #[regex("your regex", path::to::function)].
+  --> tests/tokens/incorrect-attributes.rs:51:13
+   |
+51 |     #[regex(123, match_number4)]
+   |             ^^^
+
+error: Expected identifier. Correct format is #[regex("your regex", path::to::function)].
+  --> tests/tokens/incorrect-attributes.rs:61:28
+   |
+61 |     #[regex(r"\d+(.\d+)?", "match_number5")]
+   |                            ^^^^^^^^^^^^^^^
+
+error: Expected attribute arguments in parentheses: #[regex(...)]. Correct format is #[regex("your regex", path::to::function)].
+  --> tests/tokens/incorrect-attributes.rs:68:7
+   |
+68 |     #[regex]
+   |       ^^^^^
+
+error: Unexpected end of input, expected string literal. Correct format is #[regex("your regex", path::to::function)].
+  --> tests/tokens/incorrect-attributes.rs:75:13
+   |
+75 |     #[regex()]
+   |             ^
+
+error: Expected attribute arguments in parentheses: #[exact(...)]. Correct format is #[exact("your exact string")].
+  --> tests/tokens/incorrect-attributes.rs:84:7
+   |
+84 |     #[exact]
+   |       ^^^^^
+
+error: Unexpected end of input, expected string literal. Correct format is #[exact("your exact string")].
+  --> tests/tokens/incorrect-attributes.rs:91:13
+   |
+91 |     #[exact()]
+   |             ^
+
+error: Expected string literal. Correct format is #[exact("your exact string")].
+  --> tests/tokens/incorrect-attributes.rs:98:13
+   |
+98 |     #[exact(123)]
+   |             ^^^
+
+error: Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens. Correct format is #[exact("your exact string")].
+   --> tests/tokens/incorrect-attributes.rs:105:17
+    |
+105 |     #[exact("a" "b")]
+    |                 ^^^
+
+error: The use of this attribute is not allowed. Please annotate the variant with `#[exact("your exact string")]` or `#[regex("your regex", path::to::function)]`.
+   --> tests/tokens/incorrect-attributes.rs:115:7
+    |
+115 |     #[invalid]
+    |       ^^^^^^^
+
+error: Only one attribute is allowed. Consider using only one attribute or creating another variant.
+   --> tests/tokens/incorrect-attributes.rs:123:7
+    |
+123 |     #[exact("b")]
+    |       ^^^^^
+
+error: Only one attribute is allowed. Consider using only one attribute or creating another variant.
+   --> tests/tokens/incorrect-attributes.rs:130:7
+    |
+130 |     #[regex("abc")]
+    |       ^^^^^
+
+error: Only one attribute is allowed. Consider using only one attribute or creating another variant.
+   --> tests/tokens/incorrect-attributes.rs:137:7
+    |
+137 |     #[regex("def")]
+    |       ^^^^^
+
+error: Tokens can only be derived form variants with attributes. Please annotate the variant with `#[exact("your exact string")]` or `#[regex("your regex", path::to::function)]`.
+   --> tests/tokens/incorrect-attributes.rs:144:5
+    |
+144 |     A,
+    |     ^
+
+error: cannot find attribute `invalid` in this scope
+   --> tests/tokens/incorrect-attributes.rs:115:7
+    |
+115 |     #[invalid]
+    |       ^^^^^^^

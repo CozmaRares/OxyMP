@@ -2,10 +2,18 @@
 pub struct ExactToken {
     pub pattern: String,
 }
+pub const EXACT_TOKEN_FORMAT: &str = "#[exact(\"your exact string\")]";
 
 impl syn::parse::Parse for ExactToken {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<ExactToken> {
         let pattern: syn::LitStr = input.parse()?;
+
+        if !input.is_empty() {
+            return Err(syn::Error::new(
+                input.span(),
+                "Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens"
+            ));
+        }
 
         Ok(ExactToken {
             pattern: pattern.value(),
@@ -18,27 +26,24 @@ pub struct RegexToken {
     pub regex: String,
     pub transformer: syn::Path,
 }
-
-const TRANSFORMER_NAME: &str = "transform";
+pub const REGEX_TOKEN_FORMAT: &str = "#[regex(\"your regex\", path::to::function)]";
 
 impl syn::parse::Parse for RegexToken {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<RegexToken> {
         let regex: syn::LitStr = input.parse()?;
         let _comma: syn::Token![,] = input.parse()?;
+        let transformer_path: syn::Path = input.parse()?;
 
-        let transform_ident: syn::Ident = input.parse()?;
-        if transform_ident != TRANSFORMER_NAME {
+        if !input.is_empty() {
             return Err(syn::Error::new(
-                transform_ident.span(),
-                format!("Expected `{TRANSFORMER_NAME}` as the transformer identifier",),
+                input.span(),
+                "Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens"
             ));
         }
-        let _eq: syn::Token![=] = input.parse()?;
-        let transform_path: syn::Path = input.parse()?;
 
         Ok(RegexToken {
             regex: regex.value(),
-            transformer: transform_path,
+            transformer: transformer_path,
         })
     }
 }

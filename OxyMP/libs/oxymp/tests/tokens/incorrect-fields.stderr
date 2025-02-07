@@ -1,0 +1,11 @@
+error: Exact tokens can't contain any data. Consider removing any associated data for this token variant.
+ --> tests/tokens/incorrect-fields.rs:8:10
+  |
+8 |     While(i64),
+  |          ^^^^^
+
+error: Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data.
+  --> tests/tokens/incorrect-fields.rs:19:5
+   |
+19 |     Number,
+   |     ^^^^^^

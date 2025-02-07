@@ -126,6 +126,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxymp_macro_utils"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "syn",
+]
+
+[[package]]
 name = "oxymp_rd"
 version = "0.1.0"
 dependencies = [
@@ -139,6 +147,7 @@ name = "oxymp_tokens"
 version = "0.1.0"
 dependencies = [
  "change-case",
+ "oxymp_macro_utils",
  "proc-macro2",
  "quote",
  "syn",

@@ -20,7 +20,7 @@ pub fn match_ident(matched: &str) -> LexResult<Tok> {
 
 #[derive(Debug, Tokens)]
 pub enum Tok {
-    #[regex(r"\d+(.\d+)?", transform = match_number)]
+    #[regex(r"\d+(.\d+)?", match_number)]
     Number { value: i64 },
 
     #[exact("while")]
@@ -38,7 +38,7 @@ pub enum Tok {
     #[exact("else")]
     Else,
 
-    #[regex("[a-z]+", transform = match_ident)]
+    #[regex("[a-z]+", match_ident)]
     Identifier(String),
 
     #[exact("=")]

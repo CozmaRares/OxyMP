@@ -24,7 +24,6 @@ test:
 			(echo "Testing $$crate" && cd "$$crate" && cargo test); \
 		fi \
 	done
-	echo "Tests complete."
 
 expand:
 	@FILE_NAME=expand-$(shell date +"%Y-%m-%d-%H-%M").rs && \
