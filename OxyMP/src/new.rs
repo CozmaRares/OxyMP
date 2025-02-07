@@ -1,5 +1,7 @@
+#![allow(unused)]
+
 use oxymp::{Lexer, RDParser, Tokens};
-use oxymp_util::lexer::{LexError, LexResult};
+use oxymp_util::lexer::{LexError, LexResult, LexerData};
 
 pub fn match_number(matched: &str) -> LexResult<Tok> {
     matched
@@ -16,7 +18,7 @@ pub fn match_ident(matched: &str) -> LexResult<Tok> {
     }
 }
 
-#[derive(Tokens)]
+#[derive(Debug, Tokens)]
 pub enum Tok {
     #[regex(r"\d+(.\d+)?", transform = match_number)]
     Number { value: i64 },
@@ -49,7 +51,10 @@ pub enum Tok {
 #[derive(Lexer)]
 #[tokens(Tok)]
 #[skip(r"\s+")]
-pub struct Lexer;
+pub struct Lexer(LexerData<Tok>);
+// TODO: lexer is broken for some reason
+// 1+2 -> unknown
+
 //
 //#[derive(RDParser)]
 //#[tokens(Tok)]

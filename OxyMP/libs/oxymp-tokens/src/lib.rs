@@ -224,7 +224,7 @@ fn generate_lex_rules(
 
     quote! {
         impl #ident {
-            fn make_lex_rules() -> Vec<::oxymp_util::lexer::LexRule<Self>> {
+            fn get_lex_rules() -> Vec<::oxymp_util::lexer::LexRule<Self>> {
                 vec![ #(#rules),* ]
             }
         }
@@ -249,7 +249,7 @@ fn generate_rule(
             ::oxymp_util::lexer::LexRule::new_regex(
                 #regex,
                ::std::boxed::Box::new(
-                   |state, matched_size| #transformer(state.current_n(matched_size))
+                   |input, matched_size| #transformer(&input[..matched_size])
                )
             )
         },
