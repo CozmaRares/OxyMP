@@ -96,6 +96,9 @@ fn generate_constructor(data: &MacroData) -> proc_macro2::TokenStream {
     }
 }
 
+// TODO: from utils, export the paths for each DS used in the macros
+// each module should export its own DS
+
 fn generate_tokenize_method(data: &MacroData) -> proc_macro2::TokenStream {
     let MacroData {
         skip_patterns,

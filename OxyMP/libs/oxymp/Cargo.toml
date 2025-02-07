@@ -19,3 +19,5 @@ oxymp_lexer = { version = "0.1.0", path = "../oxymp-lexer" }
 oxymp_tokens = { version = "0.1.0", path = "../oxymp-tokens" }
 oxymp_rd = { version = "0.1.0", path = "../oxymp-rd" }
 oxymp_lr = { version = "0.1.0", path = "../oxymp-lr" }
+oxymp_util = { version = "0.1.0", path = "../oxymp-util" }
+trybuild = "1.0.103"
