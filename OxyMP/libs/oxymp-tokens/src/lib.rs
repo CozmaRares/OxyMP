@@ -4,12 +4,11 @@ mod info;
 
 use change_case::snake_case;
 use oxymp_macro_utils::{symbols::Symbol, AttributeParseError};
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::spanned::Spanned;
 
 use info::*;
 
-// TODO: add user guidance for error messages
 // TODO: add token debug info
 
 const DERIVE_ATTRIBUTE: &str = "#[derive(Tokens)]";
@@ -18,6 +17,8 @@ pub fn derive_tokens_impl(
     input: proc_macro2::TokenStream,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let ast: syn::DeriveInput = syn::parse2(input)?;
+
+    let visibility = ast.vis.to_token_stream();
 
     let mod_ident = ast.ident.to_string();
     let mod_ident = snake_case(&mod_ident);
@@ -43,23 +44,36 @@ pub fn derive_tokens_impl(
         return Err(syn::Error::new(
             ast.ident.span(),
             format!(
-                "The token enum must contain at least one variant. Consider adding a variant with `{}` or `{}`.",
+                "The token enum must contain at least one variant. Consider adding a variant and anotating it with `{}` or `{}`.",
                 EXACT_TOKEN_FORMAT,
                 REGEX_TOKEN_FORMAT,
             )
         ));
     }
 
+    let _Option = Symbol::Option.to_token_stream();
+    let _None = Symbol::None.to_token_stream();
+
     let generated = enum_data
         .variants
         .iter()
         .map(|syn::Variant { ident, fields, .. }| {
             let token_struct = generate_token_struct(ident, fields);
-            let token_struct_impl = generate_token_struct_impl(&ast.ident, ident, fields);
+            let check = generate_token_conversion_check(&ast.ident, ident, fields);
+            let original_ident = &ast.ident;
 
             quote! {
-                #token_struct
-                #token_struct_impl
+                #visibility #token_struct
+
+                impl #ident {
+                    #[inline]
+                    #visibility fn from_token(token: #original_ident) -> #_Option<Self> {
+                        match token {
+                            #check
+                            _ => #_None,
+                        }
+                    }
+                }
             }
         });
 
@@ -67,7 +81,7 @@ pub fn derive_tokens_impl(
     let lex_rules = generate_lex_rules(&ast.ident, info);
 
     Ok(quote! {
-        mod #mod_ident {
+        #visibility mod #mod_ident {
             use super::*;
 
             #(#generated)*
@@ -86,16 +100,14 @@ fn generate_token_struct(ident: &syn::Ident, fields: &syn::Fields) -> proc_macro
     }
 }
 
-fn generate_token_struct_impl(
-    original_ident: &syn::Ident,
-    ident: &syn::Ident,
-    fields: &syn::Fields,
+fn generate_token_conversion_check(
+    tokens_ident: &syn::Ident,
+    variant_ident: &syn::Ident,
+    variant_fields: &syn::Fields,
 ) -> proc_macro2::TokenStream {
-    let _Option = Symbol::Option.to_token_stream();
     let _Some = Symbol::Some.to_token_stream();
-    let _None = Symbol::None.to_token_stream();
 
-    let check = match fields {
+    let check = match variant_fields {
         syn::Fields::Unnamed(fields_unnamed) => {
             let field_names = fields_unnamed
                 .unnamed
@@ -105,7 +117,7 @@ fn generate_token_struct_impl(
             let field_names = quote! { #(#field_names),* };
 
             quote! {
-                #original_ident::#ident ( #field_names ) => #_Some(Self ( #field_names )),
+                #tokens_ident::#variant_ident ( #field_names ) => #_Some(Self ( #field_names )),
             }
         }
 
@@ -117,26 +129,16 @@ fn generate_token_struct_impl(
             let field_names = quote! { #(#field_names),* };
 
             quote! {
-                #original_ident::#ident { #field_names } => #_Some(Self { #field_names }),
+                #tokens_ident::#variant_ident { #field_names } => #_Some(Self { #field_names }),
             }
         }
 
         syn::Fields::Unit => quote! {
-            #original_ident::#ident => #_Some(Self),
+            #tokens_ident::#variant_ident => #_Some(Self),
         },
     };
 
-    quote! {
-        impl #ident {
-            #[inline]
-            fn from_token(token: #original_ident) -> #_Option<Self> {
-                match token {
-                    #check
-                    _ => #_None,
-                }
-            }
-        }
-    }
+    check
 }
 
 #[derive(Debug)]
@@ -211,6 +213,7 @@ fn ensure_correct_attribute(
     }
 }
 
+#[inline]
 fn add_correct_format(format: &'static str) -> impl FnOnce(syn::Error) -> syn::Error {
     |err| {
         let span = err.span();
