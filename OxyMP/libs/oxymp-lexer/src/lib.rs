@@ -1,5 +1,7 @@
 #![allow(unused)]
+#![allow(non_snake_case)]
 
+use oxymp_macro_utils::symbols::Symbol;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
@@ -91,9 +93,11 @@ fn generate_constructor(data: &MacroData) -> proc_macro2::TokenStream {
         ..
     } = data;
 
+    let _LexerData = Symbol::UtilLexerData.to_token_stream();
+
     quote! {
         #visibility  fn new() -> Self {
-            Self(::oxymp_util::lexer::LexerData::new(#tokens_enum::get_lex_rules()))
+            Self(#_LexerData::new(#tokens_enum::get_lex_rules()))
         }
     }
 }
@@ -108,9 +112,18 @@ fn generate_tokenize_method(data: &MacroData) -> proc_macro2::TokenStream {
         visibility,
     } = data;
 
+    let _LexResult = Symbol::UtilLexResult.to_token_stream();
+    let _LexError = Symbol::UtilLexError.to_token_stream();
+    let _Vec = Symbol::Vec.to_token_stream();
+    let _str = Symbol::Str.to_token_stream();
+    let _Some = Symbol::Some.to_token_stream();
+    let _None = Symbol::None.to_token_stream();
+    let _Ok = Symbol::Ok.to_token_stream();
+    let _Err = Symbol::Err.to_token_stream();
+
     quote! {
-        #visibility fn tokenize(&self, input: &str) -> ::oxymp_util::lexer::LexResult<::std::vec::Vec<#tokens_enum>> {
-            let mut tokens = ::std::vec::Vec::new();
+        #visibility fn tokenize(&self, input: &#_str) -> #_LexResult<#_Vec<#tokens_enum>> {
+            let mut tokens = #_Vec::new();
             let mut input = input;
             let rules = &self.0.rules;
 
@@ -119,11 +132,11 @@ fn generate_tokenize_method(data: &MacroData) -> proc_macro2::TokenStream {
 
                 for rule in rules {
                     let matched_size = match rule.matches(input) {
-                       ::std::option::Option::None => continue,
-                       ::std::option::Option::Some(size) => size,
+                       #_None => continue,
+                       #_Some(size) => size,
                     };
 
-                    if let ::std::result::Result::Ok((token, remaining)) = rule.consume(input, matched_size) {
+                    if let #_Ok((token, remaining)) = rule.consume(input, matched_size) {
                         tokens.push(token);
                         was_consumed = true;
                         input = remaining;
@@ -131,10 +144,10 @@ fn generate_tokenize_method(data: &MacroData) -> proc_macro2::TokenStream {
                     }
                 }
                 if !was_consumed {
-                    return Err(::oxymp_util::lexer::LexError::unknown(input));
+                    return #_Err(#_LexError::unknown(input));
                 }
             }
-            Ok(tokens)
+            #_Ok(tokens)
         }
     }
 }

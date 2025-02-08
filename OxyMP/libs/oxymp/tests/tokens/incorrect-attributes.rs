@@ -1,5 +1,4 @@
 use oxymp::Tokens;
-use oxymp_util::lexer::LexResult;
 
 // === REGEX ===
 
@@ -13,42 +12,30 @@ enum Tok1 {
     A,
 }
 
-fn match_number2(_matched: &str) -> LexResult<Tok2> {
-    Ok(Tok2::A)
-}
-
 // missing comma between regex and function
 #[derive(Tokens)]
 enum Tok2 {
-    #[regex(r"\d+(.\d+)?" match_number2)]
+    #[regex(r"\d+(.\d+)?" match_number)]
     Number { value: i64 },
 
     #[exact("a")]
     A,
-}
-
-fn match_number3(_matched: &str) -> LexResult<Tok3> {
-    Ok(Tok3::A)
 }
 
 // extra tokens
 #[derive(Tokens)]
 enum Tok3 {
-    #[regex(r"\d+(.\d+)?", match_number3, aaa)]
+    #[regex(r"\d+(.\d+)?", match_number, aaa)]
     Number { value: i64 },
 
     #[exact("a")]
     A,
 }
 
-fn match_number4(_matched: &str) -> LexResult<Tok4> {
-    Ok(Tok4::A)
-}
-
 // regex is not a string
 #[derive(Tokens)]
 enum Tok4 {
-    #[regex(123, match_number4)]
+    #[regex(123, match_number)]
     Number { value: i64 },
 
     #[exact("a")]
@@ -58,7 +45,7 @@ enum Tok4 {
 // transform function is not a path
 #[derive(Tokens)]
 enum Tok5 {
-    #[regex(r"\d+(.\d+)?", "match_number5")]
+    #[regex(r"\d+(.\d+)?", "match_number")]
     Number { value: i64 },
 }
 

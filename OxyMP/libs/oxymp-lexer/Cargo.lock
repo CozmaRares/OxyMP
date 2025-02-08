@@ -6,6 +6,16 @@ version = 3
 name = "oxymp_lexer"
 version = "0.1.0"
 dependencies = [
+ "oxymp_macro_utils",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "oxymp_macro_utils"
+version = "0.1.0"
+dependencies = [
  "proc-macro2",
  "quote",
  "syn",

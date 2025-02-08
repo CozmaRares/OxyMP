@@ -1,7 +1,9 @@
+#![allow(non_snake_case)]
+
 mod info;
 
 use change_case::snake_case;
-use oxymp_macro_utils::AttributeParseError;
+use oxymp_macro_utils::{symbols::Symbol, AttributeParseError};
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
 
@@ -89,6 +91,10 @@ fn generate_token_struct_impl(
     ident: &syn::Ident,
     fields: &syn::Fields,
 ) -> proc_macro2::TokenStream {
+    let _Option = Symbol::Option.to_token_stream();
+    let _Some = Symbol::Some.to_token_stream();
+    let _None = Symbol::None.to_token_stream();
+
     let check = match fields {
         syn::Fields::Unnamed(fields_unnamed) => {
             let field_names = fields_unnamed
@@ -99,7 +105,7 @@ fn generate_token_struct_impl(
             let field_names = quote! { #(#field_names),* };
 
             quote! {
-                #original_ident::#ident ( #field_names ) => ::std::option::Option::Some(Self ( #field_names )),
+                #original_ident::#ident ( #field_names ) => #_Some(Self ( #field_names )),
             }
         }
 
@@ -111,22 +117,22 @@ fn generate_token_struct_impl(
             let field_names = quote! { #(#field_names),* };
 
             quote! {
-                #original_ident::#ident { #field_names } => ::std::option::Option::Some(Self { #field_names }),
+                #original_ident::#ident { #field_names } => #_Some(Self { #field_names }),
             }
         }
 
         syn::Fields::Unit => quote! {
-            #original_ident::#ident => ::std::option::Option::Some(Self),
+            #original_ident::#ident => #_Some(Self),
         },
     };
 
     quote! {
         impl #ident {
             #[inline]
-            fn from_token(token: #original_ident) -> ::std::option::Option<Self> {
+            fn from_token(token: #original_ident) -> #_Option<Self> {
                 match token {
                     #check
-                    _ => ::std::option::Option::None,
+                    _ => #_None,
                 }
             }
         }
@@ -178,12 +184,30 @@ fn ensure_correct_attribute(
             fields.span(),
             "Exact tokens can't contain any data. Consider removing any associated data for this token variant.",
         )),
-
         (TokenType::Regex, syn::Fields::Unit) => Err(syn::Error::new(
             ident.span(),
             "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
         )),
-        (TokenType::Regex, _) => Ok(()),
+        (TokenType::Regex, syn::Fields::Named(fields_named)) => {
+            if fields_named.named.is_empty() {
+                Err(syn::Error::new(
+                    ident.span(),
+                    "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
+                ))
+            } else {
+                Ok(())
+            }
+        }
+        (TokenType::Regex, syn::Fields::Unnamed(fields_unnamed)) => {
+            if fields_unnamed.unnamed.is_empty() {
+                Err(syn::Error::new(
+                    ident.span(),
+                    "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
+                ))
+            } else {
+                Ok(())
+            }
+        }
     }
 }
 
@@ -264,15 +288,20 @@ fn generate_lex_rules(
         .into_iter()
         .map(|(variant, info)| generate_rule(ident, variant, info));
 
+    let _Vec = Symbol::Vec.to_token_stream();
+    let _LexRule = Symbol::UtilLexRule.to_token_stream();
+    let _vec = Symbol::VecMacro.to_token_stream();
+
     quote! {
         impl #ident {
-            fn get_lex_rules() -> Vec<::oxymp_util::lexer::LexRule<Self>> {
-                vec![ #(#rules),* ]
+            fn get_lex_rules() -> #_Vec<#_LexRule<Self>> {
+                #_vec![ #(#rules),* ]
             }
         }
     }
 }
 
+#[inline]
 fn generate_rule(
     token_ident: &syn::Ident,
     token_variant: String,
@@ -280,17 +309,20 @@ fn generate_rule(
 ) -> proc_macro2::TokenStream {
     let variant = format_ident!("{}", token_variant);
 
+    let _LexRule = Symbol::UtilLexRule.to_token_stream();
+    let _Box = Symbol::Box.to_token_stream();
+
     match token_info {
         TokenInfo::Exact(ExactToken { pattern }) => quote! {
-           ::oxymp_util::lexer::LexRule::new_exact(
+           #_LexRule::new_exact(
                #pattern.to_string(),
-               std::boxed::Box::new(|| #token_ident::#variant),
+               #_Box::new(|| #token_ident::#variant),
            )
         },
         TokenInfo::Regex(RegexToken { regex, transformer }) => quote! {
-            ::oxymp_util::lexer::LexRule::new_regex(
+            #_LexRule::new_regex(
                 #regex,
-               ::std::boxed::Box::new(
+               #_Box::new(
                    |input, matched_size| #transformer(&input[..matched_size])
                )
             )

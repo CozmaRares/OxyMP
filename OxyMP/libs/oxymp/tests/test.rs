@@ -2,17 +2,22 @@ const TESTS_DIR: &'static str = "tests";
 
 type TestPaths = Vec<&'static str>;
 struct Tests {
-    namespace: &'static str,
+    namespace: Option<&'static str>,
     passing: TestPaths,
     failing: TestPaths,
 }
 impl Tests {
-    fn new(namespace: &'static str) -> Tests {
+    fn new() -> Tests {
         Tests {
-            namespace,
+            namespace: None,
             passing: vec![],
             failing: vec![],
         }
+    }
+
+    fn namespace(mut self, namespace: &'static str) -> Self {
+        self.namespace = Some(namespace);
+        self
     }
 
     fn pass(mut self, path: &'static str) -> Self {
@@ -34,40 +39,53 @@ struct CompiledTests {
 
 impl Tests {
     fn compile_test_paths(self) -> CompiledTests {
+        let dir = match self.namespace {
+            Some(namespace) => format!("{}/{}", TESTS_DIR, namespace),
+            None => format!("{}", TESTS_DIR),
+        };
+
         let passing = self
             .passing
             .into_iter()
-            .map(|path| format!("{}/{}/{}.rs", TESTS_DIR, self.namespace, path))
+            .map(|path| format!("{}/{}.rs", dir, path))
             .collect();
 
         let failing = self
             .failing
             .into_iter()
-            .map(|path| format!("{}/{}/{}.rs", TESTS_DIR, self.namespace, path))
+            .map(|path| format!("{}/{}.rs", dir, path))
             .collect();
 
         CompiledTests { passing, failing }
     }
 
-    fn run(self, tests: trybuild::TestCases) {
+    fn run(self) {
+        let t = trybuild::TestCases::new();
+
         let compiled = self.compile_test_paths();
 
-        compiled.passing.iter().for_each(|path| tests.pass(path));
+        compiled.passing.iter().for_each(|path| t.pass(path));
         compiled
             .failing
             .iter()
-            .for_each(|path| tests.compile_fail(path));
+            .for_each(|path| t.compile_fail(path));
     }
 }
 
+
+// TODO: visibility inheritance tests
 #[test]
 fn test_tokens() {
-    let tests = trybuild::TestCases::new();
-
-    Tests::new("tokens")
+    Tests::new()
+        .namespace("tokens")
         .pass("correct")
         .fail("incorrect-derives")
         .fail("incorrect-fields")
         .fail("incorrect-attributes")
-        .run(tests);
+        .run();
+}
+
+#[test]
+fn test_rewrite_libs() {
+    Tests::new().pass("rewrite-libs").run();
 }

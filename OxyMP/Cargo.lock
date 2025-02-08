@@ -99,6 +99,7 @@ version = "0.1.0"
 dependencies = [
  "oxymp_lexer",
  "oxymp_lr",
+ "oxymp_macro_utils",
  "oxymp_rd",
  "oxymp_tokens",
  "oxymp_util",
@@ -120,6 +121,7 @@ dependencies = [
 name = "oxymp_lexer"
 version = "0.1.0"
 dependencies = [
+ "oxymp_macro_utils",
  "proc-macro2",
  "quote",
  "syn",
@@ -139,6 +141,7 @@ name = "oxymp_macro_utils"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
+ "quote",
  "syn",
 ]
 

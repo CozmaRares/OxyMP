@@ -1,3 +1,5 @@
+pub mod symbols;
+
 fn capitalize(s: String) -> String {
     let mut c = s.chars();
     let first = c.next().unwrap();
@@ -54,7 +56,7 @@ impl From<AttributeParseError> for syn::Error {
         syn::Error::new(
             span,
             format!(
-                "{}. Correct format is {}.",
+                "{}. Correct format is `{}`.",
                 capitalize(reason),
                 correct_format
             ),
