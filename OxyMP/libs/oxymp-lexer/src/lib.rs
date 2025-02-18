@@ -1,14 +1,13 @@
-#![allow(unused)]
 #![allow(non_snake_case)]
 
+mod data;
+
 use oxymp_macro_utils::symbols::Symbol;
-use proc_macro2::Span;
-use quote::{quote, ToTokens};
-use syn::spanned::Spanned;
+use quote::quote;
 
-// TODO: get tokens from fields
-// TODO: ensure strict lexer structure: `struct Lexer(LexerData<Tokens>)`
+use data::{parse_attributes, MacroData};
 
+// TODO: dfa
 pub fn derive_lexer_impl(input: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let ast: syn::DeriveInput = syn::parse2(input)?;
     let data = parse_attributes(&ast)?;
@@ -27,65 +26,6 @@ pub fn derive_lexer_impl(input: proc_macro2::TokenStream) -> syn::Result<proc_ma
     })
 }
 
-#[derive(Debug)]
-struct MacroData {
-    visibility: proc_macro2::TokenStream,
-    skip_patterns: Vec<String>,
-    tokens_enum: syn::Path,
-}
-
-fn parse_attributes(ast: &syn::DeriveInput) -> syn::Result<MacroData> {
-    let attrs = &ast.attrs;
-
-    let mut skip_patterns = Vec::new();
-    let mut tokens_enum = None;
-
-    for attr in attrs {
-        if attr.path().is_ident("skip") {
-            let skip_attr: SkipAttr = attr.parse_args()?;
-            skip_patterns.push(skip_attr.0);
-        } else if attr.path().is_ident("tokens") {
-            if tokens_enum.is_some() {
-                return Err(syn::Error::new(
-                    attr.span(),
-                    "Multiple token enums specified. Please specify only one.",
-                ));
-            }
-            tokens_enum = Some(attr.parse_args()?);
-        }
-    }
-
-    if None == tokens_enum {
-        return Err(syn::Error::new(
-            Span::call_site(),
-            "No token enum specified. Please specify it with `#[tokens(path::to::Tokens)]`",
-        ));
-    }
-
-    return Ok(MacroData {
-        skip_patterns,
-        tokens_enum: tokens_enum.unwrap(),
-        visibility: ast.vis.to_token_stream(),
-    });
-}
-
-struct SkipAttr(String);
-
-impl syn::parse::Parse for SkipAttr {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<SkipAttr> {
-        let pattern: syn::LitStr = input.parse()?;
-
-        if !input.is_empty() {
-            return Err(syn::Error::new(
-                input.span(),
-                "Unexpected tokens. Please remove them.",
-            ));
-        }
-
-        Ok(SkipAttr(pattern.value()))
-    }
-}
-
 fn generate_constructor(data: &MacroData) -> proc_macro2::TokenStream {
     let MacroData {
         visibility,
@@ -96,7 +36,7 @@ fn generate_constructor(data: &MacroData) -> proc_macro2::TokenStream {
     let _LexerData = Symbol::UtilLexerData.to_token_stream();
 
     quote! {
-        #visibility  fn new() -> Self {
+        #visibility fn new() -> Self {
             Self(#_LexerData::new(#tokens_enum::get_lex_rules()))
         }
     }

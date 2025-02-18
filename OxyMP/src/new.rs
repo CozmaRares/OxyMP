@@ -55,17 +55,13 @@ pub struct Lexer(LexerData<Tok>);
 // TODO: lexer is broken for some reason
 // 1+2 -> unknown
 
-//
-//#[derive(RDParser)]
-//#[tokens(Tok)]
-//#[grammar_tokens(
-//    While, ParenLeft, ParenRight, If, Else, Identifier, Equal, Plus, Number
-//)]
-//#[grammar = "EWh ::= While '(' E ')' E"]
-//#[grammar = "EIf ::= If '(' E ')' E Else E"]
-//#[grammar = "EEq ::= Identifier '=' E"]
-//#[grammar = "EPl1 ::= '+' T EPl1?"]
-//#[grammar = "EPl ::= T EPl1?"]
-//#[grammar = "E ::= EWh | EIf | EEq | EPl"]
-//#[grammar = "T ::= Number | Identifier | '(' E ')'"]
-//pub struct Parser;
+#[derive(RDParser)]
+#[tokens(Tok)]
+#[grammar("EWh ::= While '(' E ')' E")]
+#[grammar("EIf ::= If '(' E ')' E Else E")]
+#[grammar("EEq ::= Identifier '=' E")]
+#[grammar("EPl1 ::= '+' T EPl1?")]
+#[grammar("EPl ::= T EPl1?")]
+#[grammar("E ::= EWh | EIf | EEq | EPl")]
+#[grammar("T ::= Number | Identifier | '(' E ')'")]
+pub struct Parser;
