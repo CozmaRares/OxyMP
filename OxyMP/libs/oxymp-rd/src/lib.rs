@@ -1,4 +1,5 @@
 mod data;
+mod grammar;
 
 use quote::quote;
 
@@ -8,7 +9,7 @@ pub fn derive_rd_impl(input: proc_macro2::TokenStream) -> syn::Result<proc_macro
     let ast: syn::DeriveInput = syn::parse2(input)?;
     let data = parse_attributes(&ast)?;
 
-    eprintln!("{:#?}", data);
+    let rules = grammar::parse_grammar(&data);
 
     Ok(quote! {})
 }
