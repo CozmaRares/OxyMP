@@ -90,3 +90,63 @@ fn token_pattern(input: &str) -> IResult<&str, SyntaxNodeKind> {
     let (input, matched) = ws(delimited(char('\''), base, char('\''))).parse(input)?;
     Ok((input, SyntaxNodeKind::Pattern(matched.into())))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! ok {
+        ($fn: ident, $str:expr) => {
+            assert!($fn($str).is_ok());
+        };
+    }
+
+    macro_rules! err {
+        ($fn: ident, $str:expr) => {
+            assert!($fn($str).is_err());
+        };
+    }
+
+    mod name {
+        use super::*;
+
+        #[test]
+        fn valid() {
+            ok!(name, "abc");
+            ok!(name, "abc123");
+            ok!(name, "XYZ");
+            ok!(name, " XYZ   ");
+        }
+
+        #[test]
+        fn invalid() {
+            err!(name, "");
+            err!(name, "1");
+            err!(name, "1abc");
+            err!(name, "_b");
+        }
+    }
+
+    mod pattern {
+        use super::*;
+
+        #[test]
+        fn valid() {
+            ok!(token_pattern, "'a'");
+            ok!(token_pattern, "'abc'");
+            ok!(token_pattern, r"'a\'b'");
+            ok!(token_pattern, r"'a\\b'");
+        }
+
+        #[test]
+        fn invalid() {
+            err!(token_pattern, "");
+            err!(token_pattern, "'+");
+            err!(token_pattern, r"'a\_'");
+            ok!(token_pattern, r"'a b'");
+        }
+    }
+
+
+    // TODO: more tests
+}

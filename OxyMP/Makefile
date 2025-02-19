@@ -1,4 +1,5 @@
 CRATES = $(shell find . -maxdepth 3 -name 'Cargo.toml' -exec dirname {} \; | sort)
+CRATES_WITH_TESTS = libs/oxymp libs/oxymp-rd
 
 all: run
 
@@ -19,10 +20,9 @@ update:
 	done
 
 test:
-	@MAIN_CRATE="libs/oxymp" && \
-	echo "Testing $$MAIN_CRATE" && \
-	cd "$$MAIN_CRATE" && \
-	cargo test
+	@for crate in $(CRATES_WITH_TESTS); do \
+		(echo "Testing $$crate" && cd $$crate && cargo test --color always); \
+	done
 
 expand:
 	@FILE_NAME=expand-$(shell date +"%Y-%m-%d-%H-%M").rs && \
