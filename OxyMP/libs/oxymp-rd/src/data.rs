@@ -20,8 +20,8 @@ pub fn parse_attributes(ast: &syn::DeriveInput) -> syn::Result<MacroData> {
 
     for attr in attrs {
         if attr.path().is_ident("grammar") {
-            let skip_attr: GrammarAttr = attr.parse_args()?;
-            grammar_rules.push(skip_attr.0);
+            let grammar_attr: GrammarAttr = attr.parse_args()?;
+            grammar_rules.push(grammar_attr.0);
         } else if attr.path().is_ident("tokens") {
             if tokens_enum.is_some() {
                 return Err(syn::Error::new(

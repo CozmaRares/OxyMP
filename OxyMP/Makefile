@@ -19,11 +19,10 @@ update:
 	done
 
 test:
-	@for crate in $(CRATES); do \
-		if [ -d "$$crate/tests" ]; then \
-			(echo "Testing $$crate" && cd "$$crate" && cargo test); \
-		fi \
-	done
+	@MAIN_CRATE="libs/oxymp" && \
+	echo "Testing $$MAIN_CRATE" && \
+	cd "$$MAIN_CRATE" && \
+	cargo test
 
 expand:
 	@FILE_NAME=expand-$(shell date +"%Y-%m-%d-%H-%M").rs && \

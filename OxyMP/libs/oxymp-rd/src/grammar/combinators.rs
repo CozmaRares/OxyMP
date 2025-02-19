@@ -37,11 +37,7 @@ pub fn parse_rule(input: &str) -> IResult<&str, SyntaxNode> {
 }
 
 fn identifier(input: &str) -> IResult<&str, &str> {
-    ws(recognize(pair(
-        alt((alpha1, tag("_"))),
-        many0_count(alt((alphanumeric1, tag("_")))),
-    )))
-    .parse(input)
+    ws(recognize(pair(alpha1, many0_count(alphanumeric1)))).parse(input)
 }
 
 fn name(input: &str) -> IResult<&str, SyntaxNodeKind> {

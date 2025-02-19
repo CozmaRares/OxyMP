@@ -1,5 +1,6 @@
-mod trybuild_tests {
-    const TESTS_DIR: &'static str = "tests/trybuild";
+mod trybuild {
+
+    const TESTS_DIR: &'static str = "tests";
 
     type TestPaths = Vec<&'static str>;
     pub struct Tests {
@@ -60,7 +61,7 @@ mod trybuild_tests {
         }
 
         pub fn run(self) {
-            let t = trybuild::TestCases::new();
+            let t = ::trybuild::TestCases::new();
 
             let compiled = self.compile_test_paths();
 
@@ -71,22 +72,22 @@ mod trybuild_tests {
                 .for_each(|path| t.compile_fail(path));
         }
     }
-}
 
-#[test]
-fn test_tokens() {
-    trybuild_tests::Tests::new()
-        .namespace("tokens")
-        .pass("correct")
-        .fail("incorrect-derives")
-        .fail("incorrect-fields")
-        .fail("incorrect-attributes")
-        .pass("public-tokens")
-        .fail("private-tokens")
-        .run();
-}
+    #[test]
+    fn test_tokens() {
+        Tests::new()
+            .namespace("tokens")
+            .pass("correct")
+            .fail("incorrect-derives")
+            .fail("incorrect-fields")
+            .fail("incorrect-attributes")
+            .pass("public-tokens")
+            .fail("private-tokens")
+            .run();
+    }
 
-#[test]
-fn test_rewrite_libs() {
-    trybuild_tests::Tests::new().pass("rewrite-libs").run();
+    #[test]
+    fn test_rewrite_libs() {
+        Tests::new().pass("rewrite-libs").run();
+    }
 }

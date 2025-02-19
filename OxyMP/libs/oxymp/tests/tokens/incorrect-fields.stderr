@@ -1,23 +1,23 @@
 error: Exact tokens can't contain any data. Consider removing any associated data for this token variant.
- --> tests/trybuild/tokens/incorrect-fields.rs:8:10
+ --> tests/tokens/incorrect-fields.rs:8:10
   |
 8 |     While(i64),
   |          ^^^^^
 
 error: Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data.
-  --> tests/trybuild/tokens/incorrect-fields.rs:19:5
+  --> tests/tokens/incorrect-fields.rs:19:5
    |
 19 |     Number,
    |     ^^^^^^
 
 error: Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data.
-  --> tests/trybuild/tokens/incorrect-fields.rs:26:5
+  --> tests/tokens/incorrect-fields.rs:26:5
    |
 26 |     Number(),
    |     ^^^^^^
 
 error: Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data.
-  --> tests/trybuild/tokens/incorrect-fields.rs:32:5
+  --> tests/tokens/incorrect-fields.rs:32:5
    |
 32 |     Number {},
    |     ^^^^^^
