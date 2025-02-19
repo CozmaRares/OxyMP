@@ -113,6 +113,7 @@ dependencies = [
  "oxymp_tokens",
  "oxymp_util",
  "proc-macro2",
+ "quote",
  "syn",
  "trybuild",
 ]

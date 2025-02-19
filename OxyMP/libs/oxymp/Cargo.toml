@@ -21,6 +21,7 @@ oxymp_tokens = { version = "0.1.0", path = "../oxymp-tokens" }
 oxymp_rd = { version = "0.1.0", path = "../oxymp-rd" }
 oxymp_lr = { version = "0.1.0", path = "../oxymp-lr" }
 oxymp_macro_utils = { version = "0.1.0", path = "../oxymp-macro-utils" }
+quote = "1.0.38"
 
 [dev-dependencies]
 trybuild = "1.0.103"
