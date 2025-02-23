@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 regex = "1.10.6"
-oxymp = { version = "0.1.0", path = "libs/oxymp", features = ["full"] }
-oxymp_util = { version = "0.1.0", path = "libs/oxymp-util" }
+oxymp = { version = "0.1.0", path = "oxymp", features = ["full"] }
+oxymp_util = { version = "0.1.0", path = "oxymp-util" }

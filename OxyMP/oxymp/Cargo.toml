@@ -16,11 +16,11 @@ lr = []
 proc-macro2 = "1.0"
 syn = { version = "2.0", features = ["extra-traits", "full"] }
 oxymp_util = { version = "0.1.0", path = "../oxymp-util" }
-oxymp_lexer = { version = "0.1.0", path = "../oxymp-lexer" }
-oxymp_tokens = { version = "0.1.0", path = "../oxymp-tokens" }
-oxymp_rd = { version = "0.1.0", path = "../oxymp-rd" }
-oxymp_lr = { version = "0.1.0", path = "../oxymp-lr" }
-oxymp_macro_utils = { version = "0.1.0", path = "../oxymp-macro-utils" }
+oxymp_lexer = { version = "0.1.0", path = "oxymp-lexer" }
+oxymp_tokens = { version = "0.1.0", path = "oxymp-tokens" }
+oxymp_rd = { version = "0.1.0", path = "oxymp-rd" }
+oxymp_lr = { version = "0.1.0", path = "oxymp-lr" }
+oxymp_macro_utils = { version = "0.1.0", path = "oxymp-macro-utils" }
 quote = "1.0.38"
 
 [dev-dependencies]

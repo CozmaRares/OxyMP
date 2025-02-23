@@ -1,13 +1,13 @@
 CRATES = $(shell find . -maxdepth 3 -name 'Cargo.toml' -exec dirname {} \; | sort)
-CRATES_WITH_TESTS = libs/oxymp libs/oxymp-rd
+CRATES_WITH_TESTS = oxymp oxymp/oxymp-rd
 
 all: run
 
 run:
-	cargo run $(ARGS)
+	@cargo run $(ARGS)
 
 trace:
-	RUST_BACKTRACE=1 $(MAKE) run $(ARGS)
+	@RUST_BACKTRACE=1 $(MAKE) run $(ARGS)
 
 check:
 	@for crate in $(CRATES); do \
