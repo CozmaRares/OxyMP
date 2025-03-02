@@ -66,23 +66,3 @@ pub struct Lexer(LexerData<Tok>);
 #[grammar("T ::= Number | Identifier | '(' E ')'")]
 pub struct Parser;
 
-use oxymp::outer;
-
-#[outer]
-mod outer {
-    use oxymp::inner;
-
-    #[inner]
-    struct InnerStruct {
-        field: u32,
-    }
-
-    struct NormalStruct {
-        field: u32,
-    }
-
-    #[inner]
-    fn inner_function() {}
-
-    fn normal_function() {}
-}
