@@ -1,6 +1,7 @@
 use quote::ToTokens;
 
 use processor::ItemProcessor;
+use syn::spanned::Spanned;
 
 use super::processor;
 
@@ -115,7 +116,6 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
             let mut pattern = None;
             let mut other_attrs = Vec::new();
 
-            // TODO: check fields
             for attr in attrs {
                 let parsed_pattern = TokenPattern::from_attr(&attr)?;
 
@@ -140,6 +140,39 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
                     "The variant has no pattern defined. Please define one.",
                 ));
             };
+
+            match (&pattern, &fields) {
+                (TokenPattern::Exact{..}, syn::Fields::Unit) => Ok(()),
+                (TokenPattern::Exact{..}, _) => Err(syn::Error::new(
+                    fields.span(),
+                    "Exact tokens can't contain any data. Consider removing any associated data for this token variant.",
+                )),
+                (TokenPattern::Regex{..}, syn::Fields::Unit) => Err(syn::Error::new(
+                    ident.span(),
+                    "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
+                )),
+                (TokenPattern::Regex{..}, syn::Fields::Named(fields_named)) => {
+                    if fields_named.named.is_empty() {
+                        Err(syn::Error::new(
+                            ident.span(),
+                            "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
+                        ))
+                    } else {
+                        Ok(())
+                    }
+                }
+                (TokenPattern::Regex{..}, syn::Fields::Unnamed(fields_unnamed)) => {
+                    if fields_unnamed.unnamed.is_empty() {
+                        Err(syn::Error::new(
+                            ident.span(),
+                            "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
+                        ))
+                    } else {
+                        Ok(())
+                    }
+                }
+            }?;
+
             patterns.push((pattern, ident.to_string()));
 
             variant.ident = ident;
