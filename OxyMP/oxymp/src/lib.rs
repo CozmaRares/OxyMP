@@ -1,13 +1,10 @@
-// TODO: include this
+// DOC: include this
 // All the credit goes to
 // experiment & starting point - https://github.com/faassen/outer_macro_pattern
 // the *only* video explaining the outer macro pattern  - https://www.youtube.com/watch?v=aEWbZxNCH0A
 
-#[macro_use]
-mod macros;
-
-mod attributes;
 mod data;
+mod utils;
 
 use data::{parse_module, MacroData};
 use quote::quote;
@@ -32,9 +29,10 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
     };
 
     let (data, mut items) = parse_module(items, &item_mod.ident)?;
-    //let generated_items = generate(data);
 
-    //items.extend(generated_items);
+    let generated_items = generate(data);
+    items.extend(generated_items);
+
     item_mod.content = Some((brace, items));
 
     Ok(quote! {
@@ -54,6 +52,6 @@ pub fn oxymp(
     .into()
 }
 
-//fn generate(data: MacroData) -> Vec<syn::Item> {
-//    todo!()
-//}
+fn generate(_data: MacroData) -> Vec<syn::Item> {
+    vec![]
+}

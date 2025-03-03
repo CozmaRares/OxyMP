@@ -1,5 +1,5 @@
-CRATES = $(shell find . -maxdepth 3 -name 'Cargo.toml' -exec dirname {} \; | sort)
-CRATES_WITH_TESTS = oxymp oxymp/oxymp-rd
+CRATES = . oxymp
+TEST_CRATES = oxymp
 
 all: run
 

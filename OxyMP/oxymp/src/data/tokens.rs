@@ -1,7 +1,8 @@
 use quote::ToTokens;
-use syn::spanned::Spanned;
 
-use crate::attributes::*;
+use processor::ItemProcessor;
+
+use super::processor;
 
 pub enum TokenPattern {
     Exact {
@@ -65,14 +66,31 @@ impl TokenPattern {
 pub struct TokensData {
     pub visibility: proc_macro2::TokenStream,
     pub ident: syn::Ident,
-    pub patterns: Vec<TokenPattern>,
+    pub patterns: Vec<(TokenPattern, String)>,
 }
 
-// TODO: initialize these in only in one place
-//const TOKENS_MARKER: syn::Attribute = parse_quote!(#[oxymp::Tokens]);
+pub struct TokensProcessor;
 
-impl TokensData {
-    pub fn new(mut item: syn::ItemEnum) -> syn::Result<(Self, syn::ItemEnum)> {
+impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
+    fn get_target() -> &'static str {
+        "Tokens"
+    }
+
+    fn get_expected_variant() -> &'static str {
+        "enum"
+    }
+
+    fn get_variant(item: &syn::Item) -> Option<syn::ItemEnum> {
+        match item {
+            syn::Item::Enum(item) => Some(item.clone()),
+            _ => None,
+        }
+    }
+
+    fn extract_data(
+        mut item: syn::ItemEnum,
+        makrer_attr_idx: usize,
+    ) -> syn::Result<(TokensData, syn::Item)> {
         if item.variants.is_empty() {
             return Err(syn::Error::new(
                 item.ident.span(),
@@ -122,7 +140,7 @@ impl TokensData {
                     "The variant has no pattern defined. Please define one.",
                 ));
             };
-            patterns.push(pattern);
+            patterns.push((pattern, ident.to_string()));
 
             variant.ident = ident;
             variant.attrs = other_attrs;
@@ -131,6 +149,7 @@ impl TokensData {
         }
 
         item.variants = variants.into_iter().collect();
+        item.attrs.remove(makrer_attr_idx);
 
         Ok((
             TokensData {
@@ -138,102 +157,7 @@ impl TokensData {
                 visibility,
                 patterns,
             },
-            item,
+            syn::Item::Enum(item),
         ))
     }
-}
-
-pub struct LexerData {
-    pub visibility: proc_macro2::TokenStream,
-    pub ident: syn::Ident,
-    pub skip_patterns: Vec<String>,
-}
-
-impl LexerData {
-    pub fn new(item: syn::ItemStruct) -> syn::Result<(Self, syn::ItemStruct)> {
-        todo!()
-    }
-}
-
-pub enum ParserKind {
-    #[cfg(feature = "rd")]
-    RD,
-    #[cfg(feature = "lr")]
-    LR,
-}
-
-pub struct ParserData {
-    pub visibility: proc_macro2::TokenStream,
-    pub ident: syn::Ident,
-    pub grammar: Vec<String>,
-    pub kind: ParserKind,
-}
-
-impl ParserData {
-    pub fn new(item: syn::ItemStruct) -> syn::Result<(Self, syn::ItemStruct)> {
-        todo!()
-    }
-}
-
-pub enum AttributeData {
-    Tokens(TokensData),
-    Lexers(LexerData),
-    Parsers(ParserData),
-}
-
-pub struct MacroData {
-    pub tokens: TokensData,
-    pub lexers: Vec<LexerData>,
-    pub parsers: Vec<ParserData>,
-}
-
-pub fn parse_module(
-    items: Vec<syn::Item>,
-    mod_ident: &syn::Ident,
-) -> syn::Result<(MacroData, Vec<syn::Item>)> {
-    let mut other_items: Vec<syn::Item> = Vec::new();
-    let mut attribute_targets: Vec<AttributeTarget> = Vec::new();
-
-    for item in items {
-        match AttributeTarget::new(item) {
-            ItemParseResult::Ok(target) => {
-                attribute_targets.push(target);
-            }
-            ItemParseResult::Ignore(item) => {
-                other_items.push(item);
-            }
-            ItemParseResult::Err(error) => return Err(error),
-        }
-    }
-
-    let mut token_target: Option<syn::ItemEnum> = None;
-
-    for target in attribute_targets {
-        match target {
-            AttributeTarget::Tokens(item) => {
-                token_target = Some(item);
-            }
-            _ => {}
-        }
-    }
-
-    let Some(token_target) = token_target else {
-        return Err(syn::Error::new(
-            mod_ident.span(),
-            "Module marked with #[oxymp] must contain at least one enum marked with #[oxymp::Tokens].",
-        ));
-    };
-
-    let (tokens_data, token_target) = TokensData::new(token_target)?;
-
-    other_items.push(syn::Item::Enum(token_target));
-
-    Ok((
-        MacroData {
-            tokens: tokens_data,
-            lexers: vec![],
-            parsers: vec![],
-        },
-        other_items,
-    ))
 }
