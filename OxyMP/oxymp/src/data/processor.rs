@@ -41,9 +41,6 @@ where
 
     let target_attribute = get_processor_attribute::<TProcessor, TData, TItem>();
 
-    eprintln!("{:#?}", attrs.iter().nth(1));
-    eprintln!("{:#?}", target_attribute);
-
     let res = if let Some(attr_idx) = attrs.get_attr(target_attribute) {
         let Some(variant) = TProcessor::get_variant(&item) else {
             return ItemProcessResult::Err(syn::Error::new(
@@ -73,14 +70,14 @@ where
     if let Some(attr) = new_attrs.attr_starts_with("oxymp") {
         let msg = if res.is_none() {
             format!(
-            "Attribute {}, containing 'oxymp', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.",
-                attr.to_token_stream().to_string()
+            "Attribute #[{}], containing 'oxymp', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.",
+                attr.path().pretty_print()
             )
         } else {
             format!(
-                "Item is first marked with #[oxymp::{}], but later with {}. Please use only one attribute.",
+                "Item is first marked with #[oxymp::{}], but later with #[{}]. Please use only one attribute.",
                 TProcessor::get_target(),
-                attr.to_token_stream().to_string()
+                attr.path().pretty_print()
             )
         };
 
@@ -180,5 +177,22 @@ impl ItemHelper for syn::Item {
             syn::Item::Use(item) => Some(&item.attrs),
             _ => None,
         }
+    }
+}
+
+trait PrettyPrint {
+    fn pretty_print(&self) -> String;
+}
+
+impl PrettyPrint for syn::Path {
+    fn pretty_print(&self) -> String {
+        let mut res = String::new();
+        self.segments.iter().for_each(|segment| {
+            res.push_str(&segment.ident.to_string());
+            res.push_str("::");
+        });
+        res.pop();
+        res.pop();
+        res
     }
 }

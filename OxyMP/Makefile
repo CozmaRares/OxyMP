@@ -1,5 +1,4 @@
 CRATES = . oxymp
-TEST_CRATES = oxymp
 
 all: run
 
@@ -20,7 +19,7 @@ update:
 	done
 
 test:
-	@for crate in $(CRATES_WITH_TESTS); do \
+	@for crate in $(CRATES); do \
 		(echo "Testing $$crate" && cd $$crate && cargo test --color always); \
 	done
 

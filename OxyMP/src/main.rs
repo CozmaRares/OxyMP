@@ -28,9 +28,9 @@ mod language {
         Minus,
     }
 
-    //#[oxymp::Lexer]
-    //#[skip(r"\s+")]
-    //pub struct Lexer;
+    #[oxymp::Lexer]
+    #[skip(r"\s+")]
+    pub struct Lexer;
     //
     //#[oxymp::RDParser]
     //#[grammar(E = T T1?)]
