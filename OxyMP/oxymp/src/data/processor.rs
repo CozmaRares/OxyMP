@@ -3,7 +3,7 @@ use syn::{parse_quote, spanned::Spanned};
 
 use crate::utils::{
     capitalize, find_attr, get_item_attrs, get_item_ds_span, get_item_variant,
-    has_attr_starting_with, pretty_print_attr_path,
+    has_attr_starting_with, pretty_print_attr_path, OXYMP_ATTR,
 };
 
 pub trait ItemProcessor<TData, TItem> {
@@ -23,9 +23,12 @@ pub fn get_processor_attribute<TProcessor, TData, TItem>() -> syn::Attribute
 where
     TProcessor: ItemProcessor<TData, TItem>,
 {
-    let segment = TProcessor::get_target();
-    let segment = format_ident!("{}", segment);
-    parse_quote! { #[oxymp::#segment] }
+    let oxymp_segment = format_ident!("{}", OXYMP_ATTR);
+
+    let target_segment = TProcessor::get_target();
+    let target_segment = format_ident!("{}", target_segment);
+
+    parse_quote! { #[#oxymp_segment::#target_segment] }
 }
 
 pub fn process_item<TProcessor, TData, TItem>(
@@ -52,7 +55,7 @@ where
         return ItemProcessResult::Err(syn::Error::new(
             get_item_ds_span(item),
             format!(
-                "{} cannot be marked with #[oxymp::{}]. Please use {}.",
+                "{} cannot be marked with #[{OXYMP_ATTR}::{}]. Please use {}.",
                 capitalize(get_item_variant(item)),
                 TProcessor::get_target(),
                 TProcessor::get_expected_variant()
@@ -67,14 +70,14 @@ where
 
     let empry_vec = Vec::new();
     let attrs = get_item_attrs(&modified_item).unwrap_or(&empry_vec);
-    let Some(attr) = has_attr_starting_with(attrs, "oxymp") else {
+    let Some(attr) = has_attr_starting_with(attrs, OXYMP_ATTR) else {
         return ItemProcessResult::Ok(data, modified_item);
     };
 
     ItemProcessResult::Err(syn::Error::new(
         attr.span(),
         format!(
-            "Item is already assumed to be marked with #[oxymp::{}], but later found #[{}]. Please use only one attribute.",
+            "Item is already assumed to be marked with #[{OXYMP_ATTR}::{}], but later found #[{}]. Please use only one attribute.",
             TProcessor::get_target(),
             pretty_print_attr_path(attr.path())
         )

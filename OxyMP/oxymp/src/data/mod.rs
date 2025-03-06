@@ -21,7 +21,7 @@ pub use rd_parser::*;
 #[cfg(feature = "lr")]
 pub use lr_parser::*;
 
-use crate::utils::{get_item_attrs, has_attr_starting_with, pretty_print_attr_path};
+use crate::utils::{get_item_attrs, has_attr_starting_with, pretty_print_attr_path, OXYMP_ATTR};
 
 #[derive(Debug)]
 pub struct MacroData {
@@ -60,7 +60,7 @@ pub fn process_module(
                     return Err(syn::Error::new(
                         mod_ident.span(),
                         format!(
-                            "Module marked with #[oxymp] must contain at most one {} marked with #[oxymp::{}].",
+                            "Module marked with #[{OXYMP_ATTR}] must contain at most one {} marked with #[{OXYMP_ATTR}::{}].",
                             TokensProcessor::get_expected_variant(),
                             TokensProcessor::get_target()
                         )
@@ -88,11 +88,11 @@ pub fn process_module(
             continue;
         };
 
-        if let Some(attr) = has_attr_starting_with(attrs, "oxymp") {
+        if let Some(attr) = has_attr_starting_with(attrs, OXYMP_ATTR) {
             return Err(syn::Error::new(
                 attr.span(),
                 format!(
-                    "Attribute #[{}], containing 'oxymp', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.",
+                    "Attribute #[{}], containing '{OXYMP_ATTR}', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.",
                     pretty_print_attr_path(attr.path())
                 )
             ));
@@ -103,32 +103,12 @@ pub fn process_module(
         return Err(syn::Error::new(
             mod_ident.span(),
             format!(
-                "Module marked with #[oxymp] must contain at least one {} marked with #[oxymp::{}].",
+                "Module marked with #[{OXYMP_ATTR}] must contain at least one {} marked with #[{OXYMP_ATTR}::{}].",
                 TokensProcessor::get_expected_variant(),
                 TokensProcessor::get_target()
             )
         ));
     }
-
-    //let mut token_target: Option<syn::ItemEnum> = None;
-    //
-    //for target in attribute_targets {
-    //    match target {
-    //        AttributeTarget::Tokens(item) => {
-    //            token_target = Some(item);
-    //        }
-    //        _ => {}
-    //    }
-    //}
-    //
-    //let Some(token_target) = token_target else {
-    //    return Err(syn::Error::new(
-    //        mod_ident.span(),
-    //        "Module marked with #[oxymp] must contain at least one enum marked with #[oxymp::Tokens].",
-    //    ));
-    //};
-    //
-    //other_items.push(syn::Item::Enum(token_target));
 
     Ok((
         MacroData {

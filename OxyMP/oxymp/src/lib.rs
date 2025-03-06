@@ -6,9 +6,13 @@
 mod data;
 mod utils;
 
-use data::{process_module, MacroData};
 use quote::quote;
 use syn::spanned::Spanned;
+
+use crate::{
+    data::{process_module, MacroData},
+    utils::OXYMP_ATTR,
+};
 
 fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let mut item_mod: syn::ItemMod = match syn::parse(item) {
@@ -24,7 +28,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
     let Some((brace, items)) = item_mod.content else {
         return Err(syn::Error::new(
             item_mod.span(),
-            "Module marked with #[oxymp] must have content.",
+            format!("Module marked with #[{OXYMP_ATTR}] must have content.",),
         ));
     };
 

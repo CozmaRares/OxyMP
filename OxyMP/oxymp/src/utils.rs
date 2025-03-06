@@ -1,5 +1,7 @@
 use syn::spanned::Spanned;
 
+pub const OXYMP_ATTR: &str = "oxymp";
+
 pub fn capitalize<S>(string: S) -> String
 where
     S: AsRef<str>,
