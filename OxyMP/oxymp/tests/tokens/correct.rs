@@ -1,49 +1,52 @@
-use oxymp::Tokens;
 use oxymp_util::lexer::{LexError, LexResult};
 
-fn match_number(matched: &str) -> LexResult<Tok> {
-    matched
-        .parse()
-        .map_err(|_| LexError::unparsable(matched))
-        .map(|v| Tok::Number { value: v })
-}
+#[oxymp::oxymp]
+mod language {
 
-fn match_ident(matched: &str) -> LexResult<Tok> {
-    if matched.len() == 1 {
-        Ok(Tok::Identifier(matched.to_string()))
-    } else {
-        Err(LexError::unparsable(matched))
+    fn match_number(matched: &str) -> LexResult<Tok> {
+        matched
+            .parse()
+            .map_err(|_| LexError::unparsable(matched))
+            .map(|v| Tok::Number { value: v })
     }
-}
 
-#[derive(Tokens)]
-enum Tok {
-    #[regex(r"\d+(.\d+)?", match_number)]
-    Number { value: i64 },
+    fn match_ident(matched: &str) -> LexResult<Tok> {
+        if matched.len() == 1 {
+            Ok(Tok::Identifier(matched.to_string()))
+        } else {
+            Err(LexError::unparsable(matched))
+        }
+    }
 
-    #[exact("while")]
-    While,
+    #[oxymp::Tokens]
+    enum Tok {
+        #[regex(r"\d+(.\d+)?", match_number)]
+        Number { value: i64 },
 
-    #[exact("(")]
-    ParenLeft,
+        #[exact("while")]
+        While,
 
-    #[exact(")")]
-    ParenRight,
+        #[exact("(")]
+        ParenLeft,
 
-    #[exact("if")]
-    If,
+        #[exact(")")]
+        ParenRight,
 
-    #[exact("else")]
-    Else,
+        #[exact("if")]
+        If,
 
-    #[regex("[a-z]+", match_ident)]
-    Identifier(String),
+        #[exact("else")]
+        Else,
 
-    #[exact("=")]
-    Equal,
+        #[regex("[a-z]+", match_ident)]
+        Identifier(String),
 
-    #[exact("+")]
-    Plus,
+        #[exact("=")]
+        Equal,
+
+        #[exact("+")]
+        Plus,
+    }
 }
 
 fn main() {}

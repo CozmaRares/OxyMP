@@ -1,35 +1,47 @@
-use oxymp::Tokens;
 use oxymp_util::lexer::LexResult;
 
 // exact variant's fields must be unit
-#[derive(Tokens)]
-enum Tok {
-    #[exact("while")]
-    While(i64),
-}
-
-fn match_number(_: &str) -> LexResult<Tok2> {
-    Ok(Tok2::Number)
+#[oxymp::oxymp]
+mod l1 {
+    #[oxymp::Tokens]
+    enum Tok {
+        #[exact("while")]
+        While(i64),
+    }
 }
 
 // regex variant's fields must not be unit
-#[derive(Tokens)]
-enum Tok2 {
-    #[regex(r"\d+(.\d+)?", match_number)]
-    Number,
+#[oxymp::oxymp]
+mod l2 {
+    fn match_number(_: &str) -> LexResult<Tok> {
+        Ok(Tok::Number)
+    }
+
+    #[oxymp::oxymp]
+    enum Tok {
+        #[regex(r"\d+(.\d+)?", match_number)]
+        Number,
+    }
 }
 
-// empty fields
-#[derive(Tokens)]
-enum Tok3 {
-    #[regex(r"\d+(.\d+)?", match_number)]
-    Number(),
+// regex variant with empty tuple
+#[oxymp::oxymp]
+mod l3 {
+    #[oxymp::Tokens]
+    enum Tok {
+        #[regex(r"\d+(.\d+)?", match_number)]
+        Number(),
+    }
 }
 
-#[derive(Tokens)]
-enum Tok4 {
-    #[regex(r"\d+(.\d+)?", match_number)]
-    Number {},
+// regex variant with empty struct
+#[oxymp::oxymp]
+mod l4 {
+    #[oxymp::Tokens]
+    enum Tok {
+        #[regex(r"\d+(.\d+)?", match_number)]
+        Number {},
+    }
 }
 
 fn main() {}
