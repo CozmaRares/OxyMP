@@ -51,7 +51,7 @@ where
         return ItemProcessResult::Ignore;
     };
 
-    let Some(variant) = TProcessor::get_variant(&item) else {
+    let Some(variant) = TProcessor::get_variant(item) else {
         return ItemProcessResult::Err(syn::Error::new(
             get_item_ds_span(item),
             format!(

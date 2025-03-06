@@ -86,19 +86,19 @@ pub fn get_item_attrs(item: &syn::Item) -> Option<&Vec<syn::Attribute>> {
     }
 }
 
-pub fn find_attr(attrs: &Vec<syn::Attribute>, attribute: syn::Attribute) -> Option<usize> {
+pub fn find_attr(attrs: &[syn::Attribute], attribute: syn::Attribute) -> Option<usize> {
     attrs.iter().position(|attr| attr == &attribute)
 }
 
 pub fn has_attr_starting_with<'a>(
-    attrs: &'a Vec<syn::Attribute>,
+    attrs: &'a [syn::Attribute],
     path_segment: &str,
 ) -> Option<&'a syn::Attribute> {
     attrs.iter().find(|attr| {
         attr.path()
             .segments
             .first()
-            .map(|segment| segment.ident.to_string() == path_segment)
+            .map(|segment| segment.ident == path_segment)
             .unwrap_or(false)
     })
 }
