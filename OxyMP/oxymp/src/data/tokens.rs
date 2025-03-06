@@ -5,6 +5,7 @@ use syn::spanned::Spanned;
 
 use super::processor;
 
+#[derive(Debug)]
 pub enum TokenPattern {
     Exact {
         pattern: String,
@@ -64,6 +65,7 @@ impl TokenPattern {
     }
 }
 
+#[derive(Debug)]
 pub struct TokensData {
     pub visibility: proc_macro2::TokenStream,
     pub ident: syn::Ident,

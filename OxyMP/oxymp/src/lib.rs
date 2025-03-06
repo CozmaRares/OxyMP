@@ -6,7 +6,7 @@
 mod data;
 mod utils;
 
-use data::{parse_module, MacroData};
+use data::{process_module, MacroData};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -28,7 +28,9 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         ));
     };
 
-    let (data, mut items) = parse_module(items, &item_mod.ident)?;
+    let (data, mut items) = process_module(items, &item_mod.ident)?;
+
+    eprintln!("{:#?}", data);
 
     let generated_items = generate(data);
     items.extend(generated_items);

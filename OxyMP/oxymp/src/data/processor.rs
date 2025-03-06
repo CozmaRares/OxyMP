@@ -1,7 +1,10 @@
-use quote::{format_ident, ToTokens};
+use quote::format_ident;
 use syn::{parse_quote, spanned::Spanned};
 
-use crate::utils::capitalize;
+use crate::utils::{
+    capitalize, find_attr, get_item_attrs, get_item_ds_span, get_item_variant,
+    has_attr_starting_with, pretty_print_attr_path,
+};
 
 pub trait ItemProcessor<TData, TItem> {
     fn get_target() -> &'static str;
@@ -32,7 +35,7 @@ pub fn process_item<TProcessor, TData, TItem>(
 where
     TProcessor: ItemProcessor<TData, TItem>,
 {
-    let Some(attrs) = item.get_attributes() else {
+    let Some(attrs) = get_item_attrs(item) else {
         return ItemProcessResult::Ignore;
     };
     if attrs.is_empty() {
@@ -41,158 +44,39 @@ where
 
     let target_attribute = get_processor_attribute::<TProcessor, TData, TItem>();
 
-    let res = if let Some(attr_idx) = attrs.get_attr(target_attribute) {
-        let Some(variant) = TProcessor::get_variant(&item) else {
-            return ItemProcessResult::Err(syn::Error::new(
-                item.get_ds_span(),
-                format!(
-                    "{} cannot be marked with #[oxymp::{}]. Please use {}.",
-                    capitalize(item.get_variant_name()),
-                    TProcessor::get_target(),
-                    TProcessor::get_expected_variant()
-                ),
-            ));
-        };
-
-        match TProcessor::extract_data(variant, attr_idx) {
-            Ok(ok) => Some(ok),
-            Err(err) => return ItemProcessResult::Err(err),
-        }
-    } else {
-        None
+    let Some(attr_idx) = find_attr(attrs, target_attribute) else {
+        return ItemProcessResult::Ignore;
     };
 
-    let new_attrs = match &res {
-        Some((_, item)) => item.get_attributes().unwrap(),
-        None => attrs,
-    };
-
-    if let Some(attr) = new_attrs.attr_starts_with("oxymp") {
-        let msg = if res.is_none() {
+    let Some(variant) = TProcessor::get_variant(&item) else {
+        return ItemProcessResult::Err(syn::Error::new(
+            get_item_ds_span(item),
             format!(
-            "Attribute #[{}], containing 'oxymp', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.",
-                attr.path().pretty_print()
-            )
-        } else {
-            format!(
-                "Item is first marked with #[oxymp::{}], but later with #[{}]. Please use only one attribute.",
+                "{} cannot be marked with #[oxymp::{}]. Please use {}.",
+                capitalize(get_item_variant(item)),
                 TProcessor::get_target(),
-                attr.path().pretty_print()
-            )
-        };
+                TProcessor::get_expected_variant()
+            ),
+        ));
+    };
 
-        return ItemProcessResult::Err(syn::Error::new(attr.span(), msg));
-    }
+    let (data, modified_item) = match TProcessor::extract_data(variant, attr_idx) {
+        Ok(ok) => ok,
+        Err(err) => return ItemProcessResult::Err(err),
+    };
 
-    match res {
-        Some((data, item)) => ItemProcessResult::Ok(data, item),
-        None => ItemProcessResult::Ignore,
-    }
-}
+    let empry_vec = Vec::new();
+    let attrs = get_item_attrs(&modified_item).unwrap_or(&empry_vec);
+    let Some(attr) = has_attr_starting_with(attrs, "oxymp") else {
+        return ItemProcessResult::Ok(data, modified_item);
+    };
 
-pub trait HasAttribute {
-    fn get_attr(&self, attribute: syn::Attribute) -> Option<usize>;
-    fn attr_starts_with(&self, path_segment: &str) -> Option<&syn::Attribute>;
-}
-
-impl HasAttribute for Vec<syn::Attribute> {
-    fn get_attr(&self, attribute: syn::Attribute) -> Option<usize> {
-        self.iter().position(|attr| attr == &attribute)
-    }
-
-    fn attr_starts_with(&self, path_segment: &str) -> Option<&syn::Attribute> {
-        self.iter().find(|attr| {
-            attr.path()
-                .segments
-                .first()
-                .map(|segment| segment.ident.to_string() == path_segment)
-                .unwrap_or(false)
-        })
-    }
-}
-
-pub trait ItemHelper {
-    fn get_attributes(&self) -> Option<&Vec<syn::Attribute>>;
-    fn get_ds_span(&self) -> proc_macro2::Span;
-    fn get_variant_name(&self) -> &'static str;
-}
-
-// implement the trait for all variants that could have attributes
-impl ItemHelper for syn::Item {
-    fn get_variant_name(&self) -> &'static str {
-        match self {
-            syn::Item::Enum(_) => "an enum",
-            syn::Item::ExternCrate(_) => "an extern crate",
-            syn::Item::Fn(_) => "a function",
-            syn::Item::ForeignMod(_) => "a foreign module",
-            syn::Item::Impl(_) => "an impl block",
-            syn::Item::Macro(_) => "a macro",
-            syn::Item::Mod(_) => "a module",
-            syn::Item::Static(_) => "a static variable",
-            syn::Item::Struct(_) => "a struct",
-            syn::Item::Trait(_) => "a trait",
-            syn::Item::TraitAlias(_) => "a trait alias",
-            syn::Item::Type(_) => "a type",
-            syn::Item::Union(_) => "a union",
-            syn::Item::Use(_) => "an import",
-            _ => "an unknown item",
-        }
-    }
-
-    fn get_ds_span(&self) -> proc_macro2::Span {
-        match self {
-            syn::Item::Enum(item) => item.enum_token.span,
-            syn::Item::ExternCrate(item) => item.extern_token.span,
-            syn::Item::Fn(item) => item.sig.fn_token.span,
-            syn::Item::ForeignMod(item) => item.abi.extern_token.span,
-            syn::Item::Impl(item) => item.impl_token.span,
-            syn::Item::Macro(item) => item.mac.path.span(),
-            syn::Item::Mod(item) => item.mod_token.span,
-            syn::Item::Static(item) => item.static_token.span,
-            syn::Item::Struct(item) => item.struct_token.span,
-            syn::Item::Trait(item) => item.trait_token.span,
-            syn::Item::TraitAlias(item) => item.trait_token.span,
-            syn::Item::Type(item) => item.type_token.span,
-            syn::Item::Union(item) => item.union_token.span,
-            syn::Item::Use(item) => item.use_token.span,
-            item => item.span(),
-        }
-    }
-
-    fn get_attributes(&self) -> Option<&Vec<syn::Attribute>> {
-        match self {
-            syn::Item::Enum(item) => Some(&item.attrs),
-            syn::Item::ExternCrate(item) => Some(&item.attrs),
-            syn::Item::Fn(item) => Some(&item.attrs),
-            syn::Item::ForeignMod(item) => Some(&item.attrs),
-            syn::Item::Impl(item) => Some(&item.attrs),
-            syn::Item::Macro(item) => Some(&item.attrs),
-            syn::Item::Mod(item) => Some(&item.attrs),
-            syn::Item::Static(item) => Some(&item.attrs),
-            syn::Item::Struct(item) => Some(&item.attrs),
-            syn::Item::Trait(item) => Some(&item.attrs),
-            syn::Item::TraitAlias(item) => Some(&item.attrs),
-            syn::Item::Type(item) => Some(&item.attrs),
-            syn::Item::Union(item) => Some(&item.attrs),
-            syn::Item::Use(item) => Some(&item.attrs),
-            _ => None,
-        }
-    }
-}
-
-trait PrettyPrint {
-    fn pretty_print(&self) -> String;
-}
-
-impl PrettyPrint for syn::Path {
-    fn pretty_print(&self) -> String {
-        let mut res = String::new();
-        self.segments.iter().for_each(|segment| {
-            res.push_str(&segment.ident.to_string());
-            res.push_str("::");
-        });
-        res.pop();
-        res.pop();
-        res
-    }
+    ItemProcessResult::Err(syn::Error::new(
+        attr.span(),
+        format!(
+            "Item is already assumed to be marked with #[oxymp::{}], but later found #[{}]. Please use only one attribute.",
+            TProcessor::get_target(),
+            pretty_print_attr_path(attr.path())
+        )
+    ))
 }
