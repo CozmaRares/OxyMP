@@ -1,6 +1,7 @@
-mod lexer;
 mod processor;
-mod tokens;
+
+pub mod lexer;
+pub mod tokens;
 
 #[cfg(feature = "rd")]
 mod rd_parser;
@@ -11,15 +12,16 @@ mod lr_parser;
 use processor::{process_item, ItemProcessResult, ItemProcessor};
 
 use syn::spanned::Spanned;
-pub use tokens::*;
 
-pub use lexer::*;
+use tokens::{TokensData, TokensProcessor};
+
+use lexer::{LexerData, LexerProcessor};
 
 #[cfg(feature = "rd")]
-pub use rd_parser::*;
+use rd_parser::RDParserData;
 
 #[cfg(feature = "lr")]
-pub use lr_parser::*;
+use lr_parser::LRParserData;
 
 use crate::utils::{get_item_attrs, has_attr_starting_with, pretty_print_attr_path, OXYMP_ATTR};
 

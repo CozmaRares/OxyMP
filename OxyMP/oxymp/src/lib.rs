@@ -4,15 +4,13 @@
 // the *only* video explaining the outer macro pattern  - https://www.youtube.com/watch?v=aEWbZxNCH0A
 
 mod data;
+mod generate;
 mod utils;
 
 use quote::quote;
 use syn::spanned::Spanned;
 
-use crate::{
-    data::{process_module, MacroData},
-    utils::OXYMP_ATTR,
-};
+use crate::{data::process_module, generate::generate, utils::OXYMP_ATTR};
 
 fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let mut item_mod: syn::ItemMod = match syn::parse(item) {
@@ -56,8 +54,4 @@ pub fn oxymp(
         Err(e) => e.to_compile_error(),
     }
     .into()
-}
-
-fn generate(_data: MacroData) -> Vec<syn::Item> {
-    vec![]
 }

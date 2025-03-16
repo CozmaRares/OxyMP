@@ -5,11 +5,11 @@ use super::processor::ItemProcessor;
 #[derive(Debug)]
 pub struct LexerData {
     pub visibility: proc_macro2::TokenStream,
-    pub ident: syn::Ident,
+    pub ident: String,
     pub skip_patterns: Vec<String>,
 }
 
-pub struct LexerProcessor;
+pub(super) struct LexerProcessor;
 
 impl ItemProcessor<LexerData, syn::ItemStruct> for LexerProcessor {
     fn get_target() -> &'static str {
@@ -54,7 +54,7 @@ impl ItemProcessor<LexerData, syn::ItemStruct> for LexerProcessor {
 
         Ok((
             LexerData {
-                ident,
+                ident: ident.to_string(),
                 visibility,
                 skip_patterns,
             },

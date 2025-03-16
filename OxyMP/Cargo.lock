@@ -72,6 +72,7 @@ dependencies = [
 name = "oxymp"
 version = "0.1.0"
 dependencies = [
+ "change-case",
  "oxymp_lexer",
  "oxymp_lr",
  "oxymp_macro_utils",

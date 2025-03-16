@@ -75,11 +75,11 @@ pub struct TokenVariant {
 #[derive(Debug)]
 pub struct TokensData {
     pub visibility: proc_macro2::TokenStream,
-    pub ident: syn::Ident,
+    pub ident: String,
     pub variants: Vec<TokenVariant>,
 }
 
-pub struct TokensProcessor;
+pub(super) struct TokensProcessor;
 
 impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
     fn get_target() -> &'static str {
@@ -199,7 +199,7 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
 
         Ok((
             TokensData {
-                ident,
+                ident: ident.to_string(),
                 visibility,
                 variants,
             },
