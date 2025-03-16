@@ -66,10 +66,17 @@ impl TokenPattern {
 }
 
 #[derive(Debug)]
+pub struct TokenVariant {
+    pub ident: String,
+    pub pattern: TokenPattern,
+    pub fields: syn::Fields,
+}
+
+#[derive(Debug)]
 pub struct TokensData {
     pub visibility: proc_macro2::TokenStream,
     pub ident: syn::Ident,
-    pub patterns: Vec<(TokenPattern, String)>,
+    pub variants: Vec<TokenVariant>,
 }
 
 pub struct TokensProcessor;
@@ -104,8 +111,8 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
         let visibility = item.vis.to_token_stream();
         let ident = item.ident.clone();
 
-        let mut patterns = Vec::new();
         let mut variants = Vec::new();
+        let mut modified_variants = Vec::new();
 
         for mut variant in item.variants {
             let syn::Variant {
@@ -175,22 +182,26 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
                 }
             }?;
 
-            patterns.push((pattern, ident.to_string()));
+            variants.push(TokenVariant {
+                ident: ident.to_string(),
+                pattern,
+                fields: fields.clone(),
+            });
 
             variant.ident = ident;
             variant.attrs = other_attrs;
             variant.fields = fields;
-            variants.push(variant);
+            modified_variants.push(variant);
         }
 
-        item.variants = variants.into_iter().collect();
+        item.variants = modified_variants.into_iter().collect();
         item.attrs.remove(makrer_attr_idx);
 
         Ok((
             TokensData {
                 ident,
                 visibility,
-                patterns,
+                variants,
             },
             syn::Item::Enum(item),
         ))
