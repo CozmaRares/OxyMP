@@ -14,7 +14,7 @@ fn unexpected<T: Display>(span: Span, expected: T) -> syn::Error {
 }
 
 fn eoi(attr_span: &Span) -> syn::Error {
-    syn::Error::new(attr_span.clone(), "Unexpected end of input.")
+    syn::Error::new(*attr_span, "Unexpected end of input.")
 }
 
 pub fn parse_grammar(
@@ -104,7 +104,7 @@ fn list(attr_span: &Span, mut input: TokenStreamIter) -> CombiResult<RawGrammarN
         ListItem::Ok(input, item) => (input, item),
         ListItem::Err(error) => return Err(error),
         ListItem::NotStrLit(_, error) => return Err(error),
-        ListItem::EOI(_) => return Err(eoi(attr_span)),
+        ListItem::Eoi(_) => return Err(eoi(attr_span)),
     };
     items.push(item);
 
@@ -113,7 +113,7 @@ fn list(attr_span: &Span, mut input: TokenStreamIter) -> CombiResult<RawGrammarN
         (input, item) = match list_item(attr_span, input) {
             ListItem::Ok(input, item) => (input, Some(item)),
             ListItem::NotStrLit(inner_input, _) => (inner_input, None),
-            ListItem::EOI(inner_input) => (inner_input, None),
+            ListItem::Eoi(inner_input) => (inner_input, None),
             ListItem::Err(error) => return Err(error),
         };
         match item {
@@ -133,7 +133,7 @@ fn list(attr_span: &Span, mut input: TokenStreamIter) -> CombiResult<RawGrammarN
 enum ListItem {
     Ok(TokenStreamIter, RawGrammarNode),
     NotStrLit(TokenStreamIter, syn::Error),
-    EOI(TokenStreamIter),
+    Eoi(TokenStreamIter),
     Err(syn::Error),
 }
 
@@ -177,7 +177,7 @@ fn list_item(attr_span: &Span, mut input: TokenStreamIter) -> ListItem {
                 let span = token.span();
                 return ListItem::NotStrLit(input, unexpected(span, ERR_MSG));
             }
-            None => return ListItem::EOI(input),
+            None => return ListItem::Eoi(input),
         };
 
         let lit = literal::<syn::LitStr>(
@@ -199,7 +199,7 @@ fn list_item(attr_span: &Span, mut input: TokenStreamIter) -> ListItem {
         Some(TokenTree::Group(_)) => group,
         Some(TokenTree::Ident(_)) => ident,
         Some(_) => lit,
-        None => return ListItem::EOI(input),
+        None => return ListItem::Eoi(input),
     };
 
     let result = handler(attr_span, input);
@@ -242,7 +242,7 @@ fn literal<T: Parse>(
 fn punct(attr_span: &Span, mut input: TokenStreamIter, chr: char) -> CombiResult<()> {
     match input.next() {
         Some(TokenTree::Punct(punct)) if punct.as_char() == chr => Ok((input, ())),
-        Some(token) => return Err(unexpected(token.span(), chr)),
-        None => return Err(eoi(attr_span)),
+        Some(token) => Err(unexpected(token.span(), chr)),
+        None => Err(eoi(attr_span)),
     }
 }

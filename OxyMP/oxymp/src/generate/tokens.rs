@@ -3,7 +3,7 @@ use syn::parse_quote;
 
 use crate::data::tokens::{TokenVariant, TokensData};
 
-pub fn generate_structs<'a>(data: &'a TokensData) -> impl Iterator<Item = syn::Item> + 'a {
+pub fn generate_structs(data: &TokensData) -> impl Iterator<Item = syn::Item> + '_ {
     data.variants
         .iter()
         .map(|variant| generate_struct(&data.ident, &data.visibility, variant))
