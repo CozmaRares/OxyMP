@@ -34,17 +34,11 @@ mod language {
 
     #[oxymp::RDParser]
     #[grammar(E = T T1?)]
-    #[grammar(T1 = ('+' | '-') E)]
-    #[grammar(T = Number | '(' E ')')]
+    #[grammar(T1 = ("+" | "-") E)]
+    #[grammar(T = Number | "(" E ")")]
     pub struct RDParser;
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //let input = "1+2";
-    //let tokens = Lexer::tokenize(input)?;
-    //let ast = Parser::E(tokens)?;
-    //
-    //println!("{:?}", ast);
-
     Ok(())
 }

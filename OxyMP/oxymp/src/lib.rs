@@ -1,5 +1,6 @@
 mod data;
 mod generate;
+mod grammar;
 mod utils;
 
 use quote::quote;
@@ -25,9 +26,10 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         ));
     };
 
-    let (data, mut items) = process_module(items, &item_mod.ident)?;
+    let (mut data, mut items) = process_module(items, &item_mod.ident)?;
 
-    eprintln!("{:#?}", data);
+    let _grammar = grammar::parse_grammar(&data.tokens, data.rd_parsers.pop().unwrap().grammar_rules)?;
+
 
     let generated_items = generate(data);
     items.extend(generated_items);

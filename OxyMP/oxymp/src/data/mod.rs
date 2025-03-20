@@ -1,13 +1,14 @@
 mod processor;
+pub mod grammar;
 
 pub mod lexer;
 pub mod tokens;
 
 #[cfg(feature = "rd")]
-mod rd_parser;
+pub mod rd_parser;
 
 #[cfg(feature = "lr")]
-mod lr_parser;
+pub mod lr_parser;
 
 use processor::{process_item, ItemProcessResult, ItemProcessor};
 

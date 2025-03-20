@@ -1,13 +1,13 @@
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use super::processor::ItemProcessor;
+use super::{grammar::GrammarData, processor::ItemProcessor};
 
 #[derive(Debug)]
 pub struct RDParserData {
     pub visibility: proc_macro2::TokenStream,
     pub ident: String,
-    pub grammar_rules: Vec<proc_macro2::TokenStream>,
+    pub grammar_rules: Vec<GrammarData>,
 }
 
 pub(super) struct RDParserProcessor;
@@ -44,8 +44,12 @@ impl ItemProcessor<RDParserData, syn::ItemStruct> for RDParserProcessor {
             let path = attr.path();
 
             if path.is_ident("grammar") {
+                let span = attr.span();
                 let grammar_attr = parse_grammar_attr(attr)?;
-                grammar_rules.push(grammar_attr);
+                grammar_rules.push(GrammarData {
+                    span,
+                    rule: grammar_attr,
+                });
             } else {
                 attributes.push(attr);
             }

@@ -1,0 +1,19 @@
+/*
+ * Derived from https://www.w3.org/TR/REC-xml/#sec-notation
+ *
+ * I took the liberty of adding a method for defining regex patterns.
+ * The construct `r/.../` denotes a regex pattern.
+**/
+
+gramamr_rule ::= IDENT '=' choice
+
+choice ::= list ('|' list)*
+
+list ::= list_item+
+
+list_item ::= (group | STRING | IDENT) ('?')?
+
+group ::= '(' choice ')'
+
+IDENT -> Rust identifier
+STRING -> Rust string literal
