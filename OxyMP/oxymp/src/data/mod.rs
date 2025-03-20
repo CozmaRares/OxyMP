@@ -11,6 +11,7 @@ mod lr_parser;
 
 use processor::{process_item, ItemProcessResult, ItemProcessor};
 
+use rd_parser::RDParserProcessor;
 use syn::spanned::Spanned;
 
 use tokens::{TokensData, TokensProcessor};
@@ -84,6 +85,20 @@ pub fn process_module(
                 continue;
             }
             ItemProcessResult::Err(error) => return Err(error),
+        }
+
+        #[cfg(feature = "rd")]
+        {
+            let res = process_item(RDParserProcessor, &item);
+            match res {
+                ItemProcessResult::Ignore => {}
+                ItemProcessResult::Ok(data, modified_item) => {
+                    rd_parser_data.push(data);
+                    final_items.push(modified_item);
+                    continue;
+                }
+                ItemProcessResult::Err(error) => return Err(error),
+            }
         }
 
         let Some(attrs) = get_item_attrs(&item) else {

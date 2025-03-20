@@ -1,8 +1,3 @@
-// DOC: include this
-// All the credit goes to
-// experiment & starting point - https://github.com/faassen/outer_macro_pattern
-// the *only* video explaining the outer macro pattern  - https://www.youtube.com/watch?v=aEWbZxNCH0A
-
 mod data;
 mod generate;
 mod utils;
@@ -26,7 +21,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
     let Some((brace, items)) = item_mod.content else {
         return Err(syn::Error::new(
             item_mod.span(),
-            format!("Module marked with #[{OXYMP_ATTR}] must have content.",),
+            format!("Module marked with #[{OXYMP_ATTR}] must have content."),
         ));
     };
 

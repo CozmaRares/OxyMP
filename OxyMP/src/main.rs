@@ -31,12 +31,12 @@ mod language {
     #[oxymp::Lexer]
     #[skip(r"\s+")]
     pub struct Lexer;
-    //
-    //#[oxymp::RDParser]
-    //#[grammar(E = T T1?)]
-    //#[grammar(T1 = ('+' | '-') E)]
-    //#[grammar(T = Number | '(' E ')')]
-    //pub struct Parser;
+
+    #[oxymp::RDParser]
+    #[grammar(E = T T1?)]
+    #[grammar(T1 = ('+' | '-') E)]
+    #[grammar(T = Number | '(' E ')')]
+    pub struct RDParser;
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
