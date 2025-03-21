@@ -20,9 +20,10 @@ fn generate_struct(
 
     let ident = format_ident!("{}{}", tokens_ident, ident);
 
-    let trailing_semi = match fields {
-        syn::Fields::Unit => quote! { ; },
-        _ => quote! {},
+    let trailing_semi = if matches!(fields, syn::Fields::Named(_)) {
+        quote! {}
+    } else {
+        quote! { ; }
     };
 
     parse_quote! {
