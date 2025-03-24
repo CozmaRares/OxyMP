@@ -53,6 +53,7 @@ pub fn process_module(
     #[cfg(feature = "lr")]
     let mut lr_parser_data: Vec<LRParserData> = Vec::new();
 
+    // TODO: handle this with an array of processors
     for item in items {
         let res = process_item(TokensProcessor, &item);
         match res {

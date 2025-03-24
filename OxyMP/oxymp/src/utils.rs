@@ -2,10 +2,7 @@ use syn::spanned::Spanned;
 
 pub const OXYMP_ATTR: &str = "oxymp";
 
-pub fn capitalize<S>(string: S) -> String
-where
-    S: AsRef<str>,
-{
+pub fn capitalize<T: AsRef<str>>(string: T) -> String {
     let string = string.as_ref();
     let mut chars = string.chars();
     if let Some(first) = chars.next() {

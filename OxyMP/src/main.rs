@@ -1,14 +1,5 @@
 #[oxymp::oxymp]
 mod language {
-    use oxymp_util::lexer::{LexError, LexResult};
-
-    pub fn match_number(matched: &str) -> LexResult<Tok> {
-        matched
-            .parse()
-            .map_err(|_| LexError::unparsable(matched))
-            .map(|v| Tok::Number { value: v })
-    }
-
     #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
@@ -26,6 +17,9 @@ mod language {
 
         #[exact("-")]
         Minus,
+
+        #[regex(r"[a-z]+", match_ident)]
+        Ident(String),
     }
 
     #[oxymp::Lexer]

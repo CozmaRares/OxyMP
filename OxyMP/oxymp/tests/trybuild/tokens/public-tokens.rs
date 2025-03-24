@@ -16,9 +16,8 @@ mod l2 {
     }
 }
 
-#[oxymp::oxymp]
 mod l3 {
-    #[oxymp::Tokens]
+    #[oxymp::oxymp]
     pub mod l {
         #[oxymp::Tokens]
         pub(crate) enum Tok {
@@ -29,7 +28,7 @@ mod l3 {
 }
 
 fn main() {
-    let _ = l1::Tok::A;
-    let _ = l2::Tok::A;
-    let _ = l3::l::Tok::A;
+    let _ = l1::TokA;
+    let _ = l2::TokA;
+    let _ = l3::l::TokA;
 }

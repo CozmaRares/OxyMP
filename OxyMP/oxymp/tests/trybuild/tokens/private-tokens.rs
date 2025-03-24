@@ -30,7 +30,7 @@ mod l3 {
 }
 
 fn main() {
-    let _ = l1::tok::A;
-    let _ = l2::l::tok::A;
-    let _ = l3::l::tok::A;
+    let _ = l1::TokA;
+    let _ = l2::l::TokA;
+    let _ = l3::l::TokA;
 }

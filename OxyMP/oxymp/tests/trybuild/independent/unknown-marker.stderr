@@ -1,0 +1,5 @@
+error: Attribute #[oxymp::Unknown], containing 'oxymp', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.
+ --> tests/trybuild/independent/unknown-marker.rs:3:5
+  |
+3 |     #[oxymp::Unknown]
+  |     ^

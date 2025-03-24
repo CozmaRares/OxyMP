@@ -134,12 +134,20 @@ mod l11 {
 // === GENERAL ERRORS ===
 
 // invalid attribute
-
 #[oxymp::oxymp]
 mod l12 {
     #[oxymp::Tokens]
     enum Tok {
         #[invalid]
+        A,
+    }
+}
+
+// no attribute
+#[oxymp::oxymp]
+mod l16 {
+    #[oxymp::Tokens]
+    enum Tok {
         A,
     }
 }
@@ -160,7 +168,7 @@ mod l14 {
     #[oxymp::Tokens]
     enum Tok {
         #[exact("a")]
-        #[regex("abc")]
+        #[regex("abc", abc)]
         A,
     }
 }
@@ -169,17 +177,8 @@ mod l14 {
 mod l15 {
     #[oxymp::Tokens]
     enum Tok {
-        #[regex("abc")]
-        #[regex("def")]
-        A,
-    }
-}
-
-// no attribute
-#[oxymp::oxymp]
-mod l16 {
-    #[oxymp::Tokens]
-    enum Tok {
+        #[regex("abc", abc)]
+        #[regex("def", def)]
         A,
     }
 }

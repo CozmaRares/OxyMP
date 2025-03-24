@@ -1,0 +1,38 @@
+error[E0603]: unit struct `TokA` is private
+  --> tests/trybuild/tokens/private-tokens.rs:33:17
+   |
+33 |     let _ = l1::TokA;
+   |                 ^^^^ private unit struct
+   |
+note: the unit struct `TokA` is defined here
+  --> tests/trybuild/tokens/private-tokens.rs:1:1
+   |
+1  | #[oxymp::oxymp]
+   | ^^^^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `oxymp::oxymp` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0603]: unit struct `TokA` is private
+  --> tests/trybuild/tokens/private-tokens.rs:34:20
+   |
+34 |     let _ = l2::l::TokA;
+   |                    ^^^^ private unit struct
+   |
+note: the unit struct `TokA` is defined here
+  --> tests/trybuild/tokens/private-tokens.rs:11:5
+   |
+11 |     #[oxymp::oxymp]
+   |     ^^^^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `oxymp::oxymp` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0603]: unit struct `TokA` is private
+  --> tests/trybuild/tokens/private-tokens.rs:35:20
+   |
+35 |     let _ = l3::l::TokA;
+   |                    ^^^^ private unit struct
+   |
+note: the unit struct `TokA` is defined here
+  --> tests/trybuild/tokens/private-tokens.rs:22:5
+   |
+22 |     #[oxymp::oxymp]
+   |     ^^^^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `oxymp::oxymp` (in Nightly builds, run with -Z macro-backtrace for more info)

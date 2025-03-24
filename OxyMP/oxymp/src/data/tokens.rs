@@ -1,7 +1,11 @@
+use std::fmt::Display;
+
 use quote::ToTokens;
 
 use processor::ItemProcessor;
 use syn::spanned::Spanned;
+
+use crate::utils::capitalize;
 
 use super::processor;
 
@@ -16,6 +20,25 @@ pub enum TokenPattern {
     },
 }
 
+#[inline]
+fn generate_err(err: syn::Error, correct_format: &str) -> syn::Error {
+    let span = err.span();
+    let msg = err.to_string();
+    let msg = format!("{}. The correct format is '{}'", msg, correct_format);
+    let msg = capitalize(msg);
+    syn::Error::new(span, msg)
+}
+
+fn exact_err(err: syn::Error) -> syn::Error {
+    const FORMAT: &str = r#"#[exact("your exact string")]"#;
+    generate_err(err, FORMAT)
+}
+
+fn regex_err(err: syn::Error) -> syn::Error {
+    const FORMAT: &str = r#"#[regex("your regex", ::path::to::function)]"#;
+    generate_err(err, FORMAT)
+}
+
 impl TokenPattern {
     fn parse_exact(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
         let pattern: syn::LitStr = input.parse()?;
@@ -23,8 +46,8 @@ impl TokenPattern {
         if !input.is_empty() {
             return Err(syn::Error::new(
                 input.span(),
-                "Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens."
-            ));
+                "Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens"
+            ))?;
         }
 
         Ok(TokenPattern::Exact {
@@ -40,7 +63,7 @@ impl TokenPattern {
         if !input.is_empty() {
             return Err(syn::Error::new(
                 input.span(),
-                "Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens."
+                "Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens"
             ));
         }
 
@@ -58,8 +81,8 @@ impl TokenPattern {
         let path_ident = path.segments.first().unwrap().ident.to_string();
 
         match path_ident.as_str() {
-            "exact" => attr.parse_args_with(TokenPattern::parse_exact).map(Some),
-            "regex" => attr.parse_args_with(TokenPattern::parse_regex).map(Some),
+            "exact" => attr.parse_args_with(TokenPattern::parse_exact).map(Some).map_err(exact_err),
+            "regex" => attr.parse_args_with(TokenPattern::parse_regex).map(Some).map_err(regex_err),
             _ => Ok(None), // ignore attr
         }
     }

@@ -1,7 +1,6 @@
-use oxymp_util::lexer::{LexError, LexResult};
-
 #[oxymp::oxymp]
 mod language {
+    use oxymp_util::lexer::{LexError, LexResult};
 
     fn match_number(matched: &str) -> LexResult<Tok> {
         matched

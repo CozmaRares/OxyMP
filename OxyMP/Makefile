@@ -1,5 +1,3 @@
-CRATES = . oxymp
-
 all: run
 
 run:
@@ -9,19 +7,13 @@ trace:
 	@RUST_BACKTRACE=1 $(MAKE) run $(ARGS)
 
 check:
-	@for crate in $(CRATES); do \
-		(echo "Checking $$crate" && cd $$crate && cargo clippy -- -Dwarnings); \
-	done
+	@cd oxymp && cargo clippy -- -Dwarnings); \
 
 update:
-	@for crate in $(CRATES); do \
-		(echo "Updating $$crate" && cd $$crate && cargo update --color always); \
-	done
+	@cd oxymp && cargo update --color always
 
 test:
-	@for crate in $(CRATES); do \
-		(echo "Testing $$crate" && cd $$crate && cargo test --color always); \
-	done
+	@cd oxymp && cargo test --color always
 
 expand:
 	@FILE_NAME=expand-$(shell date +"%Y-%m-%d-%H-%M").rs && \

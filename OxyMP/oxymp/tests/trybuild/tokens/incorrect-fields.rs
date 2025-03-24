@@ -1,5 +1,3 @@
-use oxymp_util::lexer::LexResult;
-
 // exact variant's fields must be unit
 #[oxymp::oxymp]
 mod l1 {
@@ -13,11 +11,12 @@ mod l1 {
 // regex variant's fields must not be unit
 #[oxymp::oxymp]
 mod l2 {
+    use oxymp_util::lexer::LexResult;
     fn match_number(_: &str) -> LexResult<Tok> {
         Ok(Tok::Number)
     }
 
-    #[oxymp::oxymp]
+    #[oxymp::Tokens]
     enum Tok {
         #[regex(r"\d+(.\d+)?", match_number)]
         Number,

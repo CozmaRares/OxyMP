@@ -1,0 +1,23 @@
+error: A struct cannot be marked with #[oxymp::Tokens]. Please use enum.
+ --> tests/trybuild/tokens/incorrect-marker-usage.rs:5:5
+  |
+5 |     struct Tok;
+  |     ^^^^^^
+
+error: A union cannot be marked with #[oxymp::Tokens]. Please use enum.
+  --> tests/trybuild/tokens/incorrect-marker-usage.rs:12:5
+   |
+12 |     union Tok {
+   |     ^^^^^
+
+error: Module marked with #[oxymp] must contain at least one enum marked with #[oxymp::Tokens].
+  --> tests/trybuild/tokens/incorrect-marker-usage.rs:20:5
+   |
+20 | mod l4 {}
+   |     ^^
+
+error: Module marked with #[oxymp] must contain at most one enum marked with #[oxymp::Tokens].
+  --> tests/trybuild/tokens/incorrect-marker-usage.rs:24:5
+   |
+24 | mod l5 {
+   |     ^^

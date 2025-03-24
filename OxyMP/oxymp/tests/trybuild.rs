@@ -1,4 +1,4 @@
-const TESTS_DIR: &'static str = "tests";
+const TESTS_DIR: &'static str = "tests/trybuild";
 
 type TestPaths = Vec<&'static str>;
 struct Tests {
@@ -79,16 +79,23 @@ fn test_tokens() {
         .fail("incorrect-fields")
         .fail("incorrect-marker-usage")
         .fail("incorrect-variants")
-        // TODO: after implementing generation of mod items from data
-        //.pass("public-tokens")
-        //.fail("private-tokens")
+        .pass("public-tokens")
+        .fail("private-tokens")
         .run();
 }
 
-// TODO: after implementing parsers
-// create the namespace for the test
-// test actual functionality of the parser
-//#[test]
-//fn test_rewrite_libs() {
-//    Tests::new().pass("rewrite-libs").run();
-//}
+#[test]
+fn test_independent() {
+    Tests::new()
+        .namespace("independent")
+        .fail("unknown-marker")
+        .run();
+}
+
+#[test]
+fn test_integration() {
+    Tests::new()
+        .namespace("integration")
+        .pass("no-prelude")
+        .run();
+}

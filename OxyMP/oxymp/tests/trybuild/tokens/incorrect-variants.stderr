@@ -1,0 +1,101 @@
+error: The enum has no variants defined. Please define at least one variant.
+ --> tests/trybuild/tokens/incorrect-variants.rs:5:10
+  |
+5 |     enum Tok {}
+  |          ^^^
+
+error: Expected `,`. The correct format is '#[regex("your regex", ::path::to::function)]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:15:30
+   |
+15 |         #[regex(r"\d+(.\d+)?")]
+   |                              ^
+
+error: Expected `,`. The correct format is '#[regex("your regex", ::path::to::function)]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:28:31
+   |
+28 |         #[regex(r"\d+(.\d+)?" match_number)]
+   |                               ^^^^^^^^^^^^
+
+error: Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens. The correct format is '#[regex("your regex", ::path::to::function)]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:41:44
+   |
+41 |         #[regex(r"\d+(.\d+)?", match_number, aaa)]
+   |                                            ^
+
+error: Expected string literal. The correct format is '#[regex("your regex", ::path::to::function)]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:54:17
+   |
+54 |         #[regex(123, match_number)]
+   |                 ^^^
+
+error: Expected identifier. The correct format is '#[regex("your regex", ::path::to::function)]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:67:32
+   |
+67 |         #[regex(r"\d+(.\d+)?", "match_number")]
+   |                                ^^^^^^^^^^^^^^
+
+error: Expected attribute arguments in parentheses: #[regex(...)]. The correct format is '#[regex("your regex", ::path::to::function)]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:77:11
+   |
+77 |         #[regex]
+   |           ^^^^^
+
+error: Unexpected end of input, expected string literal. The correct format is '#[regex("your regex", ::path::to::function)]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:87:17
+   |
+87 |         #[regex()]
+   |                 ^
+
+error: Expected attribute arguments in parentheses: #[exact(...)]. The correct format is '#[exact("your exact string")]'
+  --> tests/trybuild/tokens/incorrect-variants.rs:99:11
+   |
+99 |         #[exact]
+   |           ^^^^^
+
+error: Unexpected end of input, expected string literal. The correct format is '#[exact("your exact string")]'
+   --> tests/trybuild/tokens/incorrect-variants.rs:109:17
+    |
+109 |         #[exact()]
+    |                 ^
+
+error: Expected string literal. The correct format is '#[exact("your exact string")]'
+   --> tests/trybuild/tokens/incorrect-variants.rs:119:17
+    |
+119 |         #[exact(123)]
+    |                 ^^^
+
+error: Unexpected remaining tokens after parsing the attribute. Please consider removing any trailing tokens. The correct format is '#[exact("your exact string")]'
+   --> tests/trybuild/tokens/incorrect-variants.rs:129:21
+    |
+129 |         #[exact("a" "b")]
+    |                     ^^^
+
+error: The variant has no pattern defined. Please define one.
+   --> tests/trybuild/tokens/incorrect-variants.rs:142:9
+    |
+142 |         A,
+    |         ^
+
+error: The variant has no pattern defined. Please define one.
+   --> tests/trybuild/tokens/incorrect-variants.rs:151:9
+    |
+151 |         A,
+    |         ^
+
+error: The variant already has a pattern defined. Consider using only one attribute or creating another variant.
+   --> tests/trybuild/tokens/incorrect-variants.rs:162:9
+    |
+162 |         A,
+    |         ^
+
+error: The variant already has a pattern defined. Consider using only one attribute or creating another variant.
+   --> tests/trybuild/tokens/incorrect-variants.rs:172:9
+    |
+172 |         A,
+    |         ^
+
+error: The variant already has a pattern defined. Consider using only one attribute or creating another variant.
+   --> tests/trybuild/tokens/incorrect-variants.rs:182:9
+    |
+182 |         A,
+    |         ^
