@@ -30,14 +30,35 @@ type usize = ();
 mod language {
     #[oxymp::Tokens]
     enum Tok {
-        #[regex(r"\d+(.\d+)?", match_number)]
-        Number { value: i64 },
-
         #[exact("while")]
         While,
 
+        #[exact("if")]
+        If,
+
+        #[exact("else")]
+        Else,
+
         #[regex("[a-z]+", match_ident)]
         Identifier(::std::string::String),
+
+        #[regex(r"\d+(.\d+)?", match_number)]
+        Number { value: i64 },
+
+        #[exact("(")]
+        ParenL,
+
+        #[exact(")")]
+        ParenR,
+
+        #[exact("+")]
+        Plus,
+
+        #[exact("-")]
+        Minus,
+
+        #[exact("=")]
+        Equals
     }
 
     #[oxymp::Lexer]
