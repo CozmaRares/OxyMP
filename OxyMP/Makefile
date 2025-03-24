@@ -7,7 +7,7 @@ trace:
 	@RUST_BACKTRACE=1 $(MAKE) run $(ARGS)
 
 check:
-	@cd oxymp && cargo clippy -- -Dwarnings); \
+	@cd oxymp && cargo clippy -- -Dwarnings
 
 update:
 	@cd oxymp && cargo update --color always
