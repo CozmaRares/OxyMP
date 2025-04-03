@@ -12,6 +12,7 @@ pub fn generate_mod(tokens_data: &TokensData, rd_data: RDParserData) -> syn::Res
     let vis = &rd_data.visibility;
 
     let rules = parse_grammar(tokens_data, rd_data.grammar_rules)?;
+
     let ast = generate_ast(&tokens_data.ident, &rules);
     let parser = generate_parser(&rules);
 
@@ -65,10 +66,7 @@ pub fn generate_mod(tokens_data: &TokensData, rd_data: RDParserData) -> syn::Res
     Ok(syn::Item::Mod(mod_item))
 }
 
-fn generate_ast(
-    tokens_ident: &String,
-    rules: &Vec<GrammarRule>,
-) -> TokenStream {
+fn generate_ast(tokens_ident: &String, rules: &Vec<GrammarRule>) -> TokenStream {
     let structs = rules.iter().map(|GrammarRule { name, node }| {
         let ASTNode {
             main_struct,
@@ -85,9 +83,23 @@ fn generate_ast(
         q! {
             #external_choices
             #[derive(Debug)]
-            pub struct #rule_ident (
-                pub #main_struct
-            );
+            pub struct #rule_ident {
+                value: #main_struct
+            }
+
+            impl #rule_ident {
+                pub fn value_ref(&self) -> &#main_struct {
+                    &self.value
+                }
+
+                pub fn value(self) -> #main_struct {
+                    self.value
+                }
+
+                // TODO:
+                //pub fn debug(&self) -> () { }
+                //pub fn trace(&self) -> () { }
+            }
         }
     });
 
@@ -101,11 +113,7 @@ struct ASTNode {
     external_choices: Option<Vec<TokenStream>>,
 }
 
-fn generate_ast_node(
-    name: &String,
-    node: &GrammarNode,
-    tokens_ident: &String,
-) -> ASTNode {
+fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &String) -> ASTNode {
     match &node {
         GrammarNode::Rule(rule) => {
             let ident = format_ident!("{}", rule);
@@ -122,7 +130,9 @@ fn generate_ast_node(
             }
         }
         GrammarNode::List(exprs) => {
-            let defs = exprs.iter().map(|expr| generate_ast_node(name, expr, tokens_ident));
+            let defs = exprs
+                .iter()
+                .map(|expr| generate_ast_node(name, expr, tokens_ident));
             let main_struct = defs.clone().map(|d| d.main_struct);
             let external_choices = defs.filter_map(|d| d.external_choices).flatten();
 
@@ -184,11 +194,7 @@ fn generate_parser(rules: &Vec<GrammarRule>) -> TokenStream {
     }
 }
 
-fn generate_method(
-    name: &String,
-    node: &GrammarNode,
-    rules: &Vec<GrammarRule>,
-) -> TokenStream {
+fn generate_method(name: &String, node: &GrammarNode, rules: &Vec<GrammarRule>) -> TokenStream {
     let defs = expand_node(name, node, false, 1, rules);
     let toks = defs.0;
     let ident = defs.1;
@@ -200,7 +206,7 @@ fn generate_method(
             #toks
             Ok((
                 inp,
-                #rule_ident(#ident)
+                #rule_ident { value: #ident }
             ))
         }
     }
