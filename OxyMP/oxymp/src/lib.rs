@@ -1,12 +1,13 @@
+#[macro_use]
+mod utils;
+
 mod data;
 mod generate;
 mod grammar;
-mod utils;
 
-use quote::quote;
 use syn::spanned::Spanned;
 
-use crate::{data::process_module, utils::OXYMP_ATTR};
+use crate::data::process_module;
 
 fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let mut item_mod: syn::ItemMod = match syn::parse(item) {
@@ -28,21 +29,25 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
 
     let (data, mut items) = process_module(items, &item_mod.ident)?;
 
-    let grammars = data
-        .rd_parsers
-        .into_iter()
-        .map(|rdp| grammar::parse_grammar(&data.tokens, rdp.grammar_rules))
-        .collect::<Result<Vec<_>, _>>()?;
-    eprintln!("{:#?}", grammars);
-
     items.extend(generate::tokens::generate_structs(&data.tokens));
+
+    #[cfg(feature = "rd")]
+    {
+        let parsers = data
+            .rd_parsers
+            .into_iter()
+            .map(|rd_data| generate::rd::generate_mod(&data.tokens, rd_data))
+            .collect::<Result<Vec<syn::Item>, syn::Error>>()?;
+        items.extend(parsers);
+    }
 
     item_mod.content = Some((brace, items));
 
-    Ok(quote! {
-        #item_mod
-    })
+    Ok(q! { #item_mod })
 }
+
+// TODO: macro_rules! to generate these 2 things
+pub(crate) const OXYMP_ATTR: &str = "oxymp";
 
 #[proc_macro_attribute]
 pub fn oxymp(

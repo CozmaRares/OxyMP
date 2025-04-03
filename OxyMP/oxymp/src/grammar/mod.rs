@@ -333,7 +333,9 @@ fn cook_node(
             None => Err(syn::Error::new(span, "There is no known such name.")),
         },
         RawGrammarNode::Pattern(pattern, span) => match token_patterns.get(&pattern) {
-            Some(token_name) => Ok(GrammarNode::Token(token_name.clone())),
+            Some(token_name) => {
+                Ok(GrammarNode::Token(token_name.clone()))
+            }
             None => Err(syn::Error::new(
                 span,
                 "There is no known such token pattern.",
@@ -537,20 +539,30 @@ mod tests {
                 (
                     toks! { "abc"? },
                     RawGrammarNode::Optional(Box::new(RawGrammarNode::Pattern(
-                        "abc".to_string(), Span::call_site(),
+                        "abc".to_string(),
+                        Span::call_site(),
                     ))),
                 ),
                 (
                     toks! { a? },
-                    RawGrammarNode::Optional(Box::new(RawGrammarNode::Name("a".to_string(), Span::call_site()))),
+                    RawGrammarNode::Optional(Box::new(RawGrammarNode::Name(
+                        "a".to_string(),
+                        Span::call_site(),
+                    ))),
                 ),
                 (
                     toks! { (a)? },
-                    RawGrammarNode::Optional(Box::new(RawGrammarNode::Name("a".to_string(), Span::call_site()))),
+                    RawGrammarNode::Optional(Box::new(RawGrammarNode::Name(
+                        "a".to_string(),
+                        Span::call_site(),
+                    ))),
                 ),
                 (
                     toks! { a?? }, // should only parse one question mark
-                    RawGrammarNode::Optional(Box::new(RawGrammarNode::Name("a".to_string(), Span::call_site()))),
+                    RawGrammarNode::Optional(Box::new(RawGrammarNode::Name(
+                        "a".to_string(),
+                        Span::call_site(),
+                    ))),
                 ),
             ];
 

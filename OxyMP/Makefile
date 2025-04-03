@@ -21,4 +21,7 @@ expand:
 	bat $$FILE_NAME && \
 	rm $$FILE_NAME
 
-.PHONY: all run trace check expand
+count:
+	@cd oxymp/src && cloc .
+
+.PHONY: all run trace check expand count

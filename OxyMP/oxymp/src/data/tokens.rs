@@ -1,13 +1,8 @@
-use std::fmt::Display;
-
 use quote::ToTokens;
-
-use processor::ItemProcessor;
 use syn::spanned::Spanned;
 
+use super::processor::ItemProcessor;
 use crate::utils::capitalize;
-
-use super::processor;
 
 #[derive(Debug)]
 pub enum TokenPattern {
@@ -81,8 +76,14 @@ impl TokenPattern {
         let path_ident = path.segments.first().unwrap().ident.to_string();
 
         match path_ident.as_str() {
-            "exact" => attr.parse_args_with(TokenPattern::parse_exact).map(Some).map_err(exact_err),
-            "regex" => attr.parse_args_with(TokenPattern::parse_regex).map(Some).map_err(regex_err),
+            "exact" => attr
+                .parse_args_with(TokenPattern::parse_exact)
+                .map(Some)
+                .map_err(exact_err),
+            "regex" => attr
+                .parse_args_with(TokenPattern::parse_regex)
+                .map(Some)
+                .map_err(regex_err),
             _ => Ok(None), // ignore attr
         }
     }
@@ -132,7 +133,7 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
         }
 
         let visibility = item.vis.to_token_stream();
-        let ident = item.ident.clone();
+        let item_ident = item.ident.to_string();
 
         let mut variants = Vec::new();
         let mut modified_variants = Vec::new();
@@ -222,7 +223,7 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
 
         Ok((
             TokensData {
-                ident: ident.to_string(),
+                ident: item_ident,
                 visibility,
                 variants,
             },

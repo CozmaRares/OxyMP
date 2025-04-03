@@ -1,5 +1,5 @@
-mod processor;
 pub mod grammar;
+mod processor;
 
 pub mod lexer;
 pub mod tokens;
@@ -25,7 +25,10 @@ use rd_parser::RDParserData;
 #[cfg(feature = "lr")]
 use lr_parser::LRParserData;
 
-use crate::utils::{get_item_attrs, has_attr_starting_with, pretty_print_attr_path, OXYMP_ATTR};
+use crate::{
+    utils::{get_item_attrs, has_attr_starting_with, pretty_print_attr_path},
+    OXYMP_ATTR,
+};
 
 #[derive(Debug)]
 pub struct MacroData {

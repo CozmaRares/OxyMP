@@ -1,6 +1,6 @@
-use syn::spanned::Spanned;
+use std::any::Any;
 
-pub const OXYMP_ATTR: &str = "oxymp";
+use syn::spanned::Spanned;
 
 pub fn capitalize<T: AsRef<str>>(string: T) -> String {
     let string = string.as_ref();
@@ -98,4 +98,78 @@ pub fn has_attr_starting_with<'a>(
             .map(|segment| segment.ident == path_segment)
             .unwrap_or(false)
     })
+}
+
+pub fn split_iter<I, A, B>(iter: I) -> (Vec<A>, Vec<B>)
+where
+    I: Iterator<Item = (A, B)>,
+{
+    let mut a = Vec::new();
+    let mut b = Vec::new();
+    for (ia, ib) in iter {
+        a.push(ia);
+        b.push(ib);
+    }
+    (a, b)
+}
+
+pub fn extract_panic_message(e: &Box<dyn Any + Send + 'static>) -> Option<String> {
+    if let Some(s) = e.downcast_ref::<String>() {
+        Some(s.clone())
+    } else if let Some(s) = e.downcast_ref::<&str>() {
+        Some(s.to_string())
+    } else {
+        None
+    }
+}
+
+macro_rules! pq {
+    () => { ::syn::parse_quote!() };
+    ($($tt:tt)*) => {
+        {
+            let result: Result<_, _> = ::std::panic::catch_unwind(|| {
+                ::syn::parse_quote!($($tt)*)
+            });
+
+            match result {
+                Ok(val) => val,
+                Err(e) => {
+                    eprintln!("syn::parse_quote! on {}:{} paniced",
+                        file!(),
+                        line!(),
+                    );
+                    let msg = crate::utils::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
+                    panic!("{}", msg);
+                }
+            }
+        }
+    };
+}
+
+macro_rules! q {
+    () => { ::quote::quote!() };
+    ($($tt:tt)*) => { ::quote::quote!($($tt)*) };
+    ($($tt:tt)*) => {
+        {
+            let result: Result<_, _> = ::std::panic::catch_unwind(|| {
+                ::quote::quote!($($tt)*)
+            });
+
+            match result {
+                Ok(val) => val,
+                Err(_) => {
+                    eprintln!("qoute::quote! on {}:{} paniced",
+                        file!(),
+                        line!(),
+                    );
+                    let msg = crate::utils::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
+                    panic!("{}", msg);
+                }
+            }
+        }
+    };
+
+    ($($tt:tt)*) => {
+        ::quote::quote!($($tt)*)
+    };
 }

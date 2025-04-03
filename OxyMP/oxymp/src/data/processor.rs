@@ -1,9 +1,12 @@
 use quote::format_ident;
-use syn::{parse_quote, spanned::Spanned};
+use syn::spanned::Spanned;
 
-use crate::utils::{
-    capitalize, find_attr, get_item_attrs, get_item_ds_span, get_item_variant,
-    has_attr_starting_with, pretty_print_attr_path, OXYMP_ATTR,
+use crate::{
+    utils::{
+        capitalize, find_attr, get_item_attrs, get_item_ds_span, get_item_variant,
+        has_attr_starting_with, pretty_print_attr_path,
+    },
+    OXYMP_ATTR,
 };
 
 pub trait ItemProcessor<TData, TItem> {
@@ -28,7 +31,7 @@ where
     let target_segment = TProcessor::get_target();
     let target_segment = format_ident!("{}", target_segment);
 
-    parse_quote! { #[#oxymp_segment::#target_segment] }
+    pq! { #[#oxymp_segment::#target_segment] }
 }
 
 pub fn process_item<TProcessor, TData, TItem>(
