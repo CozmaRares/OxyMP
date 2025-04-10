@@ -1,9 +1,18 @@
+// TODO: remove
+#![allow(unused)]
+
+// TODO: uncomment
+// All APIs need docs!
+// #![deny(missing_docs)]
+
 #[macro_use]
-mod utils;
+mod macros;
 
 mod data;
 mod generate;
 mod grammar;
+mod nfa;
+mod utils;
 
 use syn::spanned::Spanned;
 
@@ -30,6 +39,19 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
     let (data, mut items) = process_module(items, &item_mod.ident)?;
 
     items.extend(generate::tokens::generate_structs(&data.tokens));
+
+    let nfas: Vec<_> = data
+        .tokens
+        .variants
+        .iter()
+        .map(|variant| match &variant.pattern {
+            data::tokens::TokenPattern::Exact { pattern } => pattern.as_str(),
+            data::tokens::TokenPattern::Regex { pattern, transform } => pattern.as_str(),
+        })
+        .map(|pattern| (pattern, nfa::compile(pattern).map_err(|_| "")))
+        .collect();
+
+    eprintln!("{:#?}", nfas);
 
     #[cfg(feature = "rd")]
     {

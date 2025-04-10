@@ -308,6 +308,7 @@ fn process_rules(
         .collect::<syn::Result<Vec<_>>>()
 }
 
+// TODO: find a better name
 fn cook_rule(
     rule: RawGrammarRule,
     known_names: &HashMap<String, NameType>,
@@ -363,6 +364,7 @@ fn cook_node(
     }
 }
 
+// TODO: more tests
 #[cfg(test)]
 mod tests {
     impl std::cmp::PartialEq for RawGrammarNode {
@@ -462,7 +464,6 @@ mod tests {
             }
         }
 
-        // FIX:
         #[test]
         fn keyword_as_ident() {
             let input = toks! { let };

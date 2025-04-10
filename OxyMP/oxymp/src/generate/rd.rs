@@ -378,6 +378,7 @@ where
     }
 }
 
+// TODO:
 fn compute_dir_set<'a>(
     current_rule: &String,
     node: &'a GrammarNode,
@@ -422,7 +423,7 @@ fn compute_dir_set<'a>(
             .unwrap_or_default(),
     }
 }
-
+// TODO:
 fn generate_token_check(
     rule: &str,
     check: &DirectionSet,
