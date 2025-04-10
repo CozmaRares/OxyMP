@@ -106,6 +106,46 @@ impl NFA {
             .for_each(|(_, state)| state.kind = StateKind::NotAccepting);
         self
     }
+
+    fn assert_valid(&self) {
+        assert!(
+            self.states.contains_key(&self.start_state()),
+            "NFA start state not found"
+        );
+        assert!(
+            self.states.contains_key(&self.end_state()),
+            "NFA end state not found"
+        );
+
+        assert!(
+            self.states
+                .get(&self.start_state())
+                .unwrap()
+                .transitions
+                .len()
+                != 0,
+            "NFA start state must have at least one transition"
+        );
+        assert!(
+            self.states
+                .get(&self.end_state())
+                .unwrap()
+                .transitions
+                .len()
+                == 0,
+            "NFA end state can't have any transitions"
+        );
+
+        for (state_id, state) in &self.states {
+            for (_, next_state) in &state.transitions {
+                assert!(
+                    self.states.contains_key(next_state),
+                    "Transition target state {} not found",
+                    next_state
+                );
+            }
+        }
+    }
 }
 
 impl std::fmt::Debug for NFA {
@@ -199,10 +239,12 @@ impl NFABuilder {
     }
 
     fn build(self) -> NFA {
-        NFA {
+        let nfa = NFA {
             end_state: self.end_state(),
             states: self.states,
-        }
+        };
+        nfa.assert_valid();
+        nfa
     }
 }
 
@@ -278,7 +320,7 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
         let nfa_not_accepting = nfa.clone().to_not_accepting();
 
         // first min-1 NFAs must not accept transformations
-        for _ in 0..repetition.min {
+        for _ in 1..repetition.min {
             builder.append_nfa(builder.end_state(), nfa_not_accepting.clone());
         }
 
@@ -300,12 +342,15 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
         }
 
         // connect all intermediary states to the end state
-        let mut end_state = builder.create_state(StateKind::Accepting);
+        let end_state = builder.end_state();
         for intermediary_state in intermediary_states {
-            builder.add_transition(intermediary_state, end_state, Transition::Epsilon);
+            if intermediary_state != end_state {
+                builder.add_transition(intermediary_state, end_state, Transition::Epsilon);
+            }
         }
     } else {
-        let state_before = builder.end_state();
+        let state_before = builder.create_state(StateKind::Accepting);
+        builder.add_transition(state_before - 1, state_before, Transition::Epsilon);
         builder.append_nfa(builder.end_state(), nfa);
         builder.add_transition(builder.end_state(), state_before, Transition::Epsilon);
         let state_after = builder.create_state(StateKind::Accepting);

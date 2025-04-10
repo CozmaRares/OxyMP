@@ -5,7 +5,7 @@ mod language {
     #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
-        #[exact("a")]
+        #[exact("a{2,3}")]
         A,
 
         #[exact("b")]
