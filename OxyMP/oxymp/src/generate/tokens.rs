@@ -41,20 +41,20 @@ fn generate_struct(
 
     let pub_fields = match fields {
         syn::Fields::Named(fields_named) => {
-            let fields = fields_named.named.iter().map(|f|{
+            let fields = fields_named.named.iter().map(|f| {
                 let stream = f.to_token_stream();
                 q! { pub #stream }
             });
             q! { { #(#fields),* } }
         }
         syn::Fields::Unnamed(fields_unnamed) => {
-            let fields = fields_unnamed.unnamed.iter().map(|f|{
+            let fields = fields_unnamed.unnamed.iter().map(|f| {
                 let stream = f.to_token_stream();
                 q! { pub #stream }
             });
             q! { ( #(#fields),* ) }
-        },
-        syn::Fields::Unit => q! {}
+        }
+        syn::Fields::Unit => q! {},
     };
 
     let trailing_semi = if matches!(fields, syn::Fields::Named(_)) {

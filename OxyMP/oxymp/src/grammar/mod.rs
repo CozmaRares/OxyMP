@@ -334,9 +334,7 @@ fn cook_node(
             None => Err(syn::Error::new(span, "There is no known such name.")),
         },
         RawGrammarNode::Pattern(pattern, span) => match token_patterns.get(&pattern) {
-            Some(token_name) => {
-                Ok(GrammarNode::Token(token_name.clone()))
-            }
+            Some(token_name) => Ok(GrammarNode::Token(token_name.clone())),
             None => Err(syn::Error::new(
                 span,
                 "There is no known such token pattern.",
