@@ -142,6 +142,12 @@ impl NFA {
                     "Transition target state {} not found",
                     next_state
                 );
+
+                assert!(
+                    *next_state != self.start_state(),
+                    "State {} can't have a transition to the start state",
+                    state_id
+                );
             }
         }
     }
@@ -342,15 +348,17 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
             }
         }
     } else {
-        let state_before_loop = builder.end_state();
-        builder.append_nfa(builder.end_state(), nfa);
+        let state_before_loop = builder.create_state(StateKind::Accepting);
         builder.add_transition(
-            builder.end_state(),
+            state_before_loop - 1,
             state_before_loop,
             Transition::Epsilon,
         );
-        let state_after_loop = builder.create_state(StateKind::Accepting);
-        builder.add_transition(state_before_loop, state_after_loop, Transition::Epsilon);
+        builder.append_nfa(state_before_loop, nfa);
+        builder.add_transition(builder.end_state(), state_before_loop, Transition::Epsilon);
+
+        let end_state = builder.create_state(StateKind::Accepting);
+        builder.add_transition(state_before_loop, end_state, Transition::Epsilon);
     }
 
     if !repetition.greedy {
