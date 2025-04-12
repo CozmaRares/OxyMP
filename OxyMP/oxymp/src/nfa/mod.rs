@@ -1,31 +1,40 @@
 use std::collections::HashMap;
 
 use regex_syntax::{
-    hir::{visit, Class, ClassUnicode, Hir, HirKind, Literal, Repetition, Visitor},
+    hir::{Class, ClassUnicode, Hir, HirKind, Literal, Repetition},
     parse,
 };
 
-use crate::data::{
-    lexer::LexerData,
-    tokens::{TokenPattern, TokensData},
+use crate::{
+    data::{
+        lexer::LexerData,
+        tokens::{TokenPattern, TokensData},
+    },
+    utils::capitalize,
 };
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum UnsupportedFeature {
+    #[error("empty pattern")]
     EmptyPattern,
+    #[error("lookahead pattern")]
     LookaheadPattern,
+    #[error("byte char class")]
     ByteCharClass,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum NFACompileError {
-    Message(String),
-    Unsupported(UnsupportedFeature, Hir),
+    #[error("{}", capitalize(format!("{}", .0)))]
+    Message(#[from] regex_syntax::Error),
+    #[error("NFA compilation encountered an unsupported regex feature: {0}")]
+    Unsupported(#[from] UnsupportedFeature),
 }
 
-pub fn compile(regex: &str) -> Result<NFA, NFACompileError> {
-    let hir = parse(regex).map_err(|e| NFACompileError::Message(format!("{e}")))?;
-    visit_hir(&hir).map_err(|feat| NFACompileError::Unsupported(feat, hir))
+pub fn compile<'a>(regex: &str) -> Result<GenericNFA, NFACompileError> {
+    let hir = parse(regex)?;
+    let nfa = visit_hir(&hir)?;
+    Ok(nfa)
 }
 
 #[derive(Debug, Clone)]
@@ -54,12 +63,28 @@ impl State {
 }
 
 #[derive(Clone)]
-pub struct NFA {
+pub struct NFA<T> {
+    variant: T,
     states: HashMap<usize, State>,
     end_state: usize,
 }
 
-impl NFA {
+pub type GenericNFA = NFA<()>;
+
+impl GenericNFA {
+    pub fn set_variant<T>(self, variant: T) -> NFA<T> {
+        let NFA {
+            states, end_state, ..
+        } = self;
+        NFA {
+            variant,
+            states,
+            end_state,
+        }
+    }
+}
+
+impl<T> NFA<T> {
     #[inline]
     pub fn start_state(&self) -> usize {
         0
@@ -73,6 +98,11 @@ impl NFA {
     #[inline]
     pub fn states(&self) -> &HashMap<usize, State> {
         &self.states
+    }
+
+    #[inline]
+    pub fn variant(&self) -> &T {
+        &self.variant
     }
 
     fn reindex_states(mut self, offset: usize) -> Self {
@@ -153,10 +183,12 @@ impl NFA {
     }
 }
 
-impl std::fmt::Debug for NFA {
+impl<T: std::fmt::Debug> std::fmt::Debug for NFA<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut state_ids: Vec<_> = self.states.keys().cloned().collect();
         state_ids.sort();
+
+        writeln!(f, "(variant: {:?})", self.variant)?;
 
         for state_id in state_ids {
             if let Some(state) = self.states.get(&state_id) {
@@ -227,7 +259,7 @@ impl NFABuilder {
         }
     }
 
-    fn append_nfa(&mut self, state_id: usize, mut nfa: NFA) {
+    fn append_nfa(&mut self, state_id: usize, mut nfa: GenericNFA) {
         let offset = self.end_state();
         let mut reindexed_nfa = nfa.reindex_states(offset);
         let nfa_start = reindexed_nfa
@@ -243,8 +275,9 @@ impl NFABuilder {
         self.state_id_counter = reindexed_nfa.end_state;
     }
 
-    fn build(self) -> NFA {
-        let nfa = NFA {
+    fn build(self) -> GenericNFA {
+        let nfa = GenericNFA {
+            variant: (),
             end_state: self.end_state(),
             states: self.states,
         };
@@ -253,7 +286,7 @@ impl NFABuilder {
     }
 }
 
-fn visit_hir(hir: &Hir) -> Result<NFA, UnsupportedFeature> {
+fn visit_hir(hir: &Hir) -> Result<GenericNFA, UnsupportedFeature> {
     match hir.kind() {
         HirKind::Empty => Err(UnsupportedFeature::EmptyPattern),
         HirKind::Look(look) => Err(UnsupportedFeature::LookaheadPattern),
@@ -269,7 +302,7 @@ fn visit_hir(hir: &Hir) -> Result<NFA, UnsupportedFeature> {
     }
 }
 
-fn visit_literal(literal: &Literal) -> NFA {
+fn visit_literal(literal: &Literal) -> GenericNFA {
     let literal = String::from_utf8(literal.0.to_vec())
         // TODO: error message to say this is a bug
         .expect("invalid UTF-8 parsed by regex_syntax");
@@ -293,7 +326,7 @@ fn visit_literal(literal: &Literal) -> NFA {
     builder.build()
 }
 
-fn visit_class(class: &ClassUnicode) -> NFA {
+fn visit_class(class: &ClassUnicode) -> GenericNFA {
     let mut builder = NFABuilder::new();
 
     let state = builder.create_state(StateKind::Accepting);
@@ -312,7 +345,7 @@ fn visit_class(class: &ClassUnicode) -> NFA {
     builder.build()
 }
 
-fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> {
+fn visit_repetition(repetition: &Repetition) -> Result<GenericNFA, UnsupportedFeature> {
     let mut builder = NFABuilder::new();
 
     let nfa = visit_hir(&repetition.sub)?;
@@ -373,7 +406,7 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
     Ok(builder.build())
 }
 
-fn visit_concat(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
+fn visit_concat(hirs: &[Hir]) -> Result<GenericNFA, UnsupportedFeature> {
     let mut builder = NFABuilder::new();
 
     for (idx, hir) in hirs.iter().enumerate() {
@@ -389,7 +422,7 @@ fn visit_concat(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
     Ok(builder.build())
 }
 
-fn visit_alternation(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
+fn visit_alternation(hirs: &[Hir]) -> Result<GenericNFA, UnsupportedFeature> {
     let mut builder = NFABuilder::new();
 
     let end_states = hirs

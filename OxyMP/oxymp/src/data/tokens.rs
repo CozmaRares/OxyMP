@@ -35,7 +35,9 @@ fn regex_err(err: syn::Error) -> syn::Error {
 }
 
 impl TokenPattern {
-    fn parse_exact(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
+    fn parse_exact(
+        input: syn::parse::ParseStream,
+    ) -> syn::Result<(TokenPattern, proc_macro2::Span)> {
         let pattern: syn::LitStr = input.parse()?;
 
         if !input.is_empty() {
@@ -45,12 +47,17 @@ impl TokenPattern {
             ))?;
         }
 
-        Ok(TokenPattern::Exact {
-            pattern: pattern.value(),
-        })
+        Ok((
+            TokenPattern::Exact {
+                pattern: pattern.value(),
+            },
+            pattern.span(),
+        ))
     }
 
-    fn parse_regex(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
+    fn parse_regex(
+        input: syn::parse::ParseStream,
+    ) -> syn::Result<(TokenPattern, proc_macro2::Span)> {
         let regex: syn::LitStr = input.parse()?;
         let _comma: syn::Token![,] = input.parse()?;
         let transform: syn::Path = input.parse()?;
@@ -62,13 +69,16 @@ impl TokenPattern {
             ));
         }
 
-        Ok(TokenPattern::Regex {
-            pattern: regex.value(),
-            transform,
-        })
+        Ok((
+            TokenPattern::Regex {
+                pattern: regex.value(),
+                transform,
+            },
+            regex.span(),
+        ))
     }
 
-    fn from_attr(attr: &syn::Attribute) -> syn::Result<Option<TokenPattern>> {
+    fn from_attr(attr: &syn::Attribute) -> syn::Result<Option<(TokenPattern, proc_macro2::Span)>> {
         let path = attr.path();
         if path.segments.len() != 1 {
             return Ok(None);
@@ -92,7 +102,9 @@ impl TokenPattern {
 #[derive(Debug)]
 pub struct TokenVariant {
     pub ident: String,
+    pub ident_span: proc_macro2::Span,
     pub pattern: TokenPattern,
+    pub pattern_span: proc_macro2::Span,
     pub fields: syn::Fields,
 }
 
@@ -147,14 +159,15 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
             } = variant;
 
             let mut pattern = None;
+            let mut pattern_span = None;
             let mut other_attrs = Vec::new();
 
             for attr in attrs {
-                let parsed_pattern = TokenPattern::from_attr(&attr)?;
+                let result = TokenPattern::from_attr(&attr)?;
 
-                match parsed_pattern {
+                match result {
                     None => other_attrs.push(attr),
-                    Some(parsed_pattern) => {
+                    Some((parsed_pattern, span)) => {
                         if pattern.is_some() {
                             return Err(syn::Error::new(
                                 ident.span(),
@@ -163,6 +176,7 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
                         }
 
                         pattern = Some(parsed_pattern);
+                        pattern_span = Some(span);
                     }
                 }
             }
@@ -208,7 +222,9 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
 
             variants.push(TokenVariant {
                 ident: ident.to_string(),
+                ident_span: ident.span(),
                 pattern,
+                pattern_span: pattern_span.expect("pattern_span should always be Some"),
                 fields: fields.clone(),
             });
 

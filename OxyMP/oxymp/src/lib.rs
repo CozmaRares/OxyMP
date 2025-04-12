@@ -40,16 +40,29 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
 
     items.extend(generate::tokens::generate_structs(&data.tokens));
 
-    let nfas: Vec<_> = data
-        .tokens
-        .variants
-        .iter()
-        .map(|variant| match &variant.pattern {
+    let mut nfas = Vec::new();
+
+    for variant in &data.tokens.variants {
+        let pattern = match &variant.pattern {
             data::tokens::TokenPattern::Exact { pattern } => pattern.as_str(),
             data::tokens::TokenPattern::Regex { pattern, transform } => pattern.as_str(),
-        })
-        .map(|pattern| (pattern, nfa::compile(pattern)))
-        .collect();
+        };
+
+        let nfa = nfa::compile(pattern)
+            .map(|nfa| nfa.set_variant(&variant.ident))
+            .map_err(|e| {
+                syn::Error::new(
+                    variant.pattern_span,
+                    format!(
+                        "Error while compiling regex pattern for token variant '{}'\n{}",
+                        variant.ident,
+                        e
+                    ),
+                )
+            })?;
+
+        nfas.push(nfa);
+    }
 
     eprintln!("{:#?}", nfas);
 
