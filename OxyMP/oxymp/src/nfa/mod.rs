@@ -15,7 +15,6 @@ pub enum UnsupportedFeature {
     EmptyPattern,
     LookaheadPattern,
     ByteCharClass,
-    NonGreedyRepetition,
 }
 
 #[derive(Debug)]
@@ -308,10 +307,6 @@ fn visit_class(class: &ClassUnicode) -> NFA {
 }
 
 fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> {
-    if !repetition.greedy {
-        return Err(UnsupportedFeature::NonGreedyRepetition);
-    }
-
     let mut builder = NFABuilder::new();
 
     let nfa = visit_hir(&repetition.sub)?;
@@ -327,8 +322,6 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
         // last NFA to meet the min requirement
         builder.append_nfa(builder.end_state(), nfa.clone());
     }
-
-    let after_min = builder.end_state();
 
     if let Some(max) = repetition.max {
         let mut intermediary_states = vec![builder.end_state()];
@@ -349,12 +342,24 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
             }
         }
     } else {
-        let state_before = builder.create_state(StateKind::Accepting);
-        builder.add_transition(state_before - 1, state_before, Transition::Epsilon);
+        let state_before_loop = builder.end_state();
         builder.append_nfa(builder.end_state(), nfa);
-        builder.add_transition(builder.end_state(), state_before, Transition::Epsilon);
-        let state_after = builder.create_state(StateKind::Accepting);
-        builder.add_transition(state_before, state_after, Transition::Epsilon);
+        builder.add_transition(
+            builder.end_state(),
+            state_before_loop,
+            Transition::Epsilon,
+        );
+        let state_after_loop = builder.create_state(StateKind::Accepting);
+        builder.add_transition(state_before_loop, state_after_loop, Transition::Epsilon);
+    }
+
+    if !repetition.greedy {
+        // if repetition is not greedy, we can jump dirrectly to the end state
+        builder.add_transition(
+            builder.start_state(),
+            builder.end_state(),
+            Transition::Epsilon,
+        );
     }
 
     Ok(builder.build())

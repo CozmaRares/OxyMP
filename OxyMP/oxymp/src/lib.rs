@@ -48,7 +48,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
             data::tokens::TokenPattern::Exact { pattern } => pattern.as_str(),
             data::tokens::TokenPattern::Regex { pattern, transform } => pattern.as_str(),
         })
-        .map(|pattern| (pattern, nfa::compile(pattern).map_err(|_| "")))
+        .map(|pattern| (pattern, nfa::compile(pattern)))
         .collect();
 
     eprintln!("{:#?}", nfas);
@@ -68,7 +68,6 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
     Ok(q! { #item_mod })
 }
 
-// TODO: macro_rules! to generate these 2 things
 pub(crate) const OXYMP_ATTR: &str = "oxymp";
 
 #[proc_macro_attribute]

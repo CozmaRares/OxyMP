@@ -5,67 +5,32 @@ mod language {
     #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
-        #[exact("a{2,3}")]
-        A,
+        #[exact(r"a*")]
+        AS,
 
-        #[exact("b")]
-        B,
+        #[exact(r"a?")]
+        AQ,
 
-        #[exact("(a)|(b)")]
-        Alt,
+        #[exact(r"a{2}")]
+        AA,
 
-        #[exact("((a)|(b))*")]
-        Many0,
+        #[exact(r"a{2,}")]
+        AAA,
 
-        #[exact("(a)(b)(b)")]
-        Chain,
+        #[exact(r"a{2,3}")]
+        AAAB,
 
-        #[exact("((a)|(b))*(a)(b)(b)")]
-        All,
+        #[exact(r"a{2,3}?")]
+        AAABQ,
 
-        #[exact("(a|b)*abb")]
-        All2,
-        // #[exact(r"ab|C")]
-        // A0,
-        //
-        // #[exact(r"a")]
-        // A,
-        //
-        // #[exact(r"ab")]
-        // AB,
-        //
-        // #[exact("a|b")]
-        // AB2,
-        //
-        // #[exact(r"[a-c]")]
-        // AZ,
-        //
-        // #[exact(r"ab")]
-        // AP,
-        //
-        // #[exact(r"a*")]
-        // AS,
-        //
-        // #[exact(r"a?")]
-        // AQ,
-        //
-        // #[exact(r"a{2}")]
-        // AA,
-        //
-        // #[exact(r"a{2,}")]
-        // AAA,
-        //
-        // #[exact(r"a{2,3}")]
-        // AAAB,
-        //
-        // #[exact(r"a{2,3}?")]
-        // AAABQ,
-        //
-        // #[exact(r"a{2,3}+")]
-        // AAABP,
-        //
-        // #[exact(r"a{2,3}*")]
-        // AAABS,
+        #[exact(r"(a{2,3})?")]
+        AAABQ2,
+
+        #[exact(r"a{2,3}+")]
+        AAABP,
+
+        #[exact(r"a{2,3}*")]
+        AAABS,
         //
         //#[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
         //Number { value: f64 },
