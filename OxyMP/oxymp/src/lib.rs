@@ -85,9 +85,16 @@ pub(crate) const OXYMP_ATTR: &str = "oxymp";
 
 #[proc_macro_attribute]
 pub fn oxymp(
-    _attr: proc_macro::TokenStream,
+    attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    if !attr.is_empty() {
+        let msg = "Invalid 'oxymp' attribute. The attribute must not have any arguments, such as `#[oxymp::oxymp]` or `#[oxymp]`.";
+        let toks = proc_macro2::TokenStream::from(attr);
+        let span = toks.span();
+        return syn::Error::new(span, msg).to_compile_error().into();
+    }
+
     match oxymp_impl(item) {
         Ok(tokens) => tokens,
         Err(e) => e.to_compile_error(),
