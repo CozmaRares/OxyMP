@@ -8,7 +8,7 @@ mod language {
         #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
         Number { value: f64 },
 
-        #[exact(r"\(?")]
+        #[exact(r"\(")]
         ParenLeft,
 
         #[exact(r"\)")]
@@ -24,10 +24,10 @@ mod language {
         Ident(String),
     }
 
-    //#[oxymp::Lexer]
-    //#[skip(r"\s+")]
-    //pub struct Lexer;
-    //
+    #[oxymp::Lexer]
+    #[skip(r"[ \t]+")]
+    pub struct Lexer;
+
     //#[oxymp::RDParser]
     //#[grammar(E = T T1?)]
     //#[grammar(T1 = (r"\+" | "-") E)]

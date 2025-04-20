@@ -8,15 +8,15 @@
 #[macro_use]
 mod macros;
 
+mod automata;
 mod data;
 mod generate;
 mod grammar;
-mod nfa;
 mod utils;
 
 use syn::spanned::Spanned;
 
-use crate::data::process_module;
+use crate::{automata::nfa, data::process_module};
 
 fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let mut item_mod: syn::ItemMod = match syn::parse(item) {
@@ -40,7 +40,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
 
     items.extend(generate::tokens::generate_structs(&data.tokens));
 
-    let mut nfas = Vec::new();
+    let mut token_nfas = Vec::new();
 
     for variant in &data.tokens.variants {
         let pattern = match &variant.pattern {
@@ -48,9 +48,8 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
             data::tokens::TokenPattern::Regex { pattern, transform } => pattern.as_str(),
         };
 
-        let nfa = nfa::compile(pattern)
-            .map(|nfa| nfa.set_variant(&variant.ident))
-            .map_err(|e| {
+        let nfa =
+            nfa::compile(pattern, nfa::StateTag::Token(variant.ident.clone())).map_err(|e| {
                 syn::Error::new(
                     variant.pattern_span,
                     format!(
@@ -60,10 +59,35 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
                 )
             })?;
 
-        nfas.push(nfa);
+        token_nfas.push(nfa);
     }
 
-    eprintln!("{:#?}", nfas);
+    let mut lexer_nfas = Vec::new();
+
+    for lexer_data in &data.lexers {
+        let mut skip_nfas = Vec::new();
+
+        for (pattern, span) in &lexer_data.skip_patterns {
+            let nfa = nfa::compile(pattern, nfa::StateTag::Skip).map_err(|e| {
+                syn::Error::new(
+                    *span,
+                    format!(
+                        "Error while compiling regex pattern for skip pattern '{}'\n{}",
+                        pattern, e
+                    ),
+                )
+            })?;
+
+            skip_nfas.push(nfa);
+        }
+
+        skip_nfas.extend(token_nfas.clone());
+
+        let lexer_nfa = nfa::combine(skip_nfas);
+        lexer_nfas.push(lexer_nfa);
+    }
+
+    eprintln!("{:#?}", lexer_nfas);
 
     #[cfg(feature = "rd")]
     {

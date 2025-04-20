@@ -1,4 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Debug,
+};
 
 // TODO: consistend naming: state_id for usize and state for State
 
@@ -35,15 +38,41 @@ pub enum NFACompileError {
     PatternMatchesEmptyString(String),
 }
 
-type NFACompileResult = Result<GenericNFA, NFACompileError>;
+type NFACompileResult = Result<NFA, NFACompileError>;
 
-pub fn compile<'a>(regex: &str) -> NFACompileResult {
+pub fn compile<'a>(regex: &str, tag: StateTag) -> NFACompileResult {
     let hir = parse(regex)?;
-    let nfa = visit_hir(&hir)?;
-    match nfa.matches_empty_string() {
-        true => Err(NFACompileError::PatternMatchesEmptyString(regex.to_string())),
-        false => Ok(nfa),
+    let mut nfa = visit_hir(&hir)?;
+
+    if nfa.matches_empty_string() {
+        return Err(NFACompileError::PatternMatchesEmptyString(
+            regex.to_string(),
+        ));
+    };
+
+    nfa.set_states_tag(tag);
+    Ok(nfa)
+}
+
+// handled exactly like an alteration
+pub fn combine(nfas: Vec<NFA>) -> NFA {
+    let mut builder = NFABuilder::new();
+
+    let end_states: Vec<_> = nfas
+        .into_iter()
+        .map(|nfa| {
+            builder.append_nfa(builder.start_state(), nfa);
+            builder.end_state()
+        })
+        .collect();
+
+    // reconnect dangling ending states of inner NFAs
+    let mut end_state = builder.create_state(StateKind::Accepting);
+    for end_state_ in end_states {
+        builder.add_transition(end_state_, end_state, Transition::Epsilon);
     }
+
+    builder.build()
 }
 
 #[derive(Debug, Clone)]
@@ -60,40 +89,50 @@ pub enum StateKind {
 }
 
 #[derive(Debug, Clone)]
+pub enum StateTag {
+    Skip,
+    Token(String),
+    None,
+}
+
+#[derive(Debug, Clone)]
 pub struct State {
     pub transitions: Vec<(Transition, usize)>,
     pub kind: StateKind,
+    pub tag: StateTag,
 }
 
 impl State {
+    fn new() -> Self {
+        Self {
+            transitions: Vec::new(),
+            kind: StateKind::NotAccepting,
+            tag: StateTag::None,
+        }
+    }
+
     fn add_transition(&mut self, transition: Transition, target: usize) {
         self.transitions.push((transition, target));
     }
 }
 
 #[derive(Clone)]
-pub struct NFA<T> {
-    variant: T,
+pub struct NFA {
     states: HashMap<usize, State>,
     end_state: usize,
 }
 
-pub type GenericNFA = NFA<()>;
-
-impl GenericNFA {
-    pub fn set_variant<T>(self, variant: T) -> NFA<T> {
-        let NFA {
-            states, end_state, ..
-        } = self;
-        NFA {
-            variant,
-            states,
-            end_state,
-        }
+impl NFA {
+    fn set_states_tag(&mut self, tag: StateTag) {
+        self.states.iter_mut().for_each(|(id, state)| {
+            if matches!(state.kind, StateKind::Accepting) {
+                state.tag = tag.clone();
+            }
+        });
     }
 }
 
-impl<T> NFA<T> {
+impl NFA {
     #[inline]
     pub fn start_state(&self) -> usize {
         0
@@ -102,16 +141,6 @@ impl<T> NFA<T> {
     #[inline]
     pub fn end_state(&self) -> usize {
         self.end_state
-    }
-
-    #[inline]
-    pub fn states(&self) -> &HashMap<usize, State> {
-        &self.states
-    }
-
-    #[inline]
-    pub fn variant(&self) -> &T {
-        &self.variant
     }
 
     fn reindex_states(mut self, offset: usize) -> Self {
@@ -216,16 +245,14 @@ impl<T> NFA<T> {
     }
 }
 
-impl<T: std::fmt::Debug> std::fmt::Debug for NFA<T> {
+impl Debug for NFA {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut state_ids: Vec<_> = self.states.keys().cloned().collect();
         state_ids.sort();
 
-        writeln!(f, "(variant: {:?})", self.variant)?;
-
         for state_id in state_ids {
             if let Some(state) = self.states.get(&state_id) {
-                write!(f, "State {} {:?}: ", state_id, state.kind)?;
+                write!(f, "State ({}:{:?}) {:?}: ", state_id, state.tag, state.kind)?;
 
                 for (i, t) in state.transitions.iter().enumerate() {
                     write!(f, "{:?}", t)?;
@@ -256,10 +283,7 @@ impl NFABuilder {
             states: HashMap::new(),
         };
 
-        let start_state = State {
-            kind: StateKind::NotAccepting,
-            transitions: Vec::new(),
-        };
+        let start_state = State::new();
         builder.states.insert(builder.start_state(), start_state);
 
         builder
@@ -277,10 +301,9 @@ impl NFABuilder {
         self.state_id_counter += 1;
         let id = self.state_id_counter;
 
-        let state = State {
-            kind,
-            transitions: Vec::new(),
-        };
+        let mut state = State::new();
+        state.kind = kind;
+
         self.states.insert(id, state);
 
         id
@@ -292,7 +315,7 @@ impl NFABuilder {
         }
     }
 
-    fn append_nfa(&mut self, state_id: usize, mut nfa: GenericNFA) {
+    fn append_nfa(&mut self, state_id: usize, mut nfa: NFA) {
         let offset = self.end_state();
         let mut reindexed_nfa = nfa.reindex_states(offset);
         let nfa_start = reindexed_nfa
@@ -308,9 +331,8 @@ impl NFABuilder {
         self.state_id_counter = reindexed_nfa.end_state;
     }
 
-    fn build(self) -> GenericNFA {
-        let nfa = GenericNFA {
-            variant: (),
+    fn build(self) -> NFA {
+        let nfa = NFA {
             end_state: self.end_state(),
             states: self.states,
         };
@@ -319,7 +341,7 @@ impl NFABuilder {
     }
 }
 
-fn visit_hir(hir: &Hir) -> Result<GenericNFA, UnsupportedFeature> {
+fn visit_hir(hir: &Hir) -> Result<NFA, UnsupportedFeature> {
     match hir.kind() {
         HirKind::Empty => Err(UnsupportedFeature::EmptyPattern),
         HirKind::Look(look) => Err(UnsupportedFeature::LookaheadPattern),
@@ -335,7 +357,7 @@ fn visit_hir(hir: &Hir) -> Result<GenericNFA, UnsupportedFeature> {
     }
 }
 
-fn visit_literal(literal: &Literal) -> GenericNFA {
+fn visit_literal(literal: &Literal) -> NFA {
     let literal = String::from_utf8(literal.0.to_vec())
         // TODO: error message to say this is a bug
         .expect("invalid UTF-8 parsed by regex_syntax");
@@ -359,7 +381,7 @@ fn visit_literal(literal: &Literal) -> GenericNFA {
     builder.build()
 }
 
-fn visit_class(class: &ClassUnicode) -> GenericNFA {
+fn visit_class(class: &ClassUnicode) -> NFA {
     let mut builder = NFABuilder::new();
 
     let state = builder.create_state(StateKind::Accepting);
@@ -371,14 +393,18 @@ fn visit_class(class: &ClassUnicode) -> GenericNFA {
         builder.add_transition(
             builder.start_state(),
             state,
-            Transition::Chars { start, end },
+            if start == end {
+                Transition::Char(start)
+            } else {
+                Transition::Chars { start, end }
+            },
         );
     }
 
     builder.build()
 }
 
-fn visit_repetition(repetition: &Repetition) -> Result<GenericNFA, UnsupportedFeature> {
+fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> {
     let mut builder = NFABuilder::new();
 
     let nfa = visit_hir(&repetition.sub)?;
@@ -439,7 +465,7 @@ fn visit_repetition(repetition: &Repetition) -> Result<GenericNFA, UnsupportedFe
     Ok(builder.build())
 }
 
-fn visit_concat(hirs: &[Hir]) -> Result<GenericNFA, UnsupportedFeature> {
+fn visit_concat(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
     let mut builder = NFABuilder::new();
 
     for (idx, hir) in hirs.iter().enumerate() {
@@ -455,7 +481,7 @@ fn visit_concat(hirs: &[Hir]) -> Result<GenericNFA, UnsupportedFeature> {
     Ok(builder.build())
 }
 
-fn visit_alternation(hirs: &[Hir]) -> Result<GenericNFA, UnsupportedFeature> {
+fn visit_alternation(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
     let mut builder = NFABuilder::new();
 
     let end_states = hirs
