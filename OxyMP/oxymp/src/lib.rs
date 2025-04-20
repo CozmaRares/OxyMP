@@ -55,8 +55,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
                     variant.pattern_span,
                     format!(
                         "Error while compiling regex pattern for token variant '{}'\n{}",
-                        variant.ident,
-                        e
+                        variant.ident, e
                     ),
                 )
             })?;

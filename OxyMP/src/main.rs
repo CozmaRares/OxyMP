@@ -5,50 +5,23 @@ mod language {
     #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
-        #[exact(r"a*")]
-        AS,
+        #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
+        Number { value: f64 },
 
-        #[exact(r"a?")]
-        AQ,
+        #[exact(r"\(?")]
+        ParenLeft,
 
-        #[exact(r"a{2}")]
-        AA,
+        #[exact(r"\)")]
+        ParenRight,
 
-        #[exact(r"a{2,}")]
-        AAA,
+        #[exact(r"\+")]
+        Plus,
 
-        #[exact(r"a{2,3}")]
-        AAAB,
+        #[exact("-")]
+        Minus,
 
-        #[exact(r"a{2,3}?")]
-        AAABQ,
-
-        #[exact(r"(a{2,3})?")]
-        AAABQ2,
-
-        #[exact(r"a{2,3}+")]
-        AAABP,
-
-        #[exact(r"a{2,3}*")]
-        AAABS,
-        //
-        //#[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
-        //Number { value: f64 },
-        //
-        //#[exact(r"\(")]
-        //ParenLeft,
-        //
-        //#[exact(r"\)")]
-        //ParenRight,
-        //
-        //#[exact(r"\+")]
-        //Plus,
-        //
-        //#[exact("-")]
-        //Minus,
-        //
-        //#[regex(r"[a-z]+", match_ident)]
-        //Ident(String),
+        #[regex(r"[a-z]+", match_ident)]
+        Ident(String),
     }
 
     //#[oxymp::Lexer]

@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+
+// TODO: consistend naming: state_id for usize and state for State
 
 use regex_syntax::{
     hir::{Class, ClassUnicode, Hir, HirKind, Literal, Repetition},
@@ -29,12 +31,19 @@ pub enum NFACompileError {
     Message(#[from] regex_syntax::Error),
     #[error("NFA compilation encountered an unsupported regex feature: {0}")]
     Unsupported(#[from] UnsupportedFeature),
+    #[error("NFA compiled from '{0}' allows matching an empty string. Token variants must match at least one character.")]
+    PatternMatchesEmptyString(String),
 }
 
-pub fn compile<'a>(regex: &str) -> Result<GenericNFA, NFACompileError> {
+type NFACompileResult = Result<GenericNFA, NFACompileError>;
+
+pub fn compile<'a>(regex: &str) -> NFACompileResult {
     let hir = parse(regex)?;
     let nfa = visit_hir(&hir)?;
-    Ok(nfa)
+    match nfa.matches_empty_string() {
+        true => Err(NFACompileError::PatternMatchesEmptyString(regex.to_string())),
+        false => Ok(nfa),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -181,6 +190,30 @@ impl<T> NFA<T> {
             }
         }
     }
+
+    fn matches_empty_string(&self) -> bool {
+        let mut queue = VecDeque::new();
+        queue.push_back(self.start_state());
+
+        while let Some(state_id) = queue.pop_front() {
+            if state_id == self.end_state() {
+                return true;
+            }
+
+            let Some(state) = self.states.get(&state_id) else {
+                continue;
+            };
+
+            for (transition, next_state_id) in &state.transitions {
+                match transition {
+                    Transition::Epsilon => queue.push_back(*next_state_id),
+                    _ => {}
+                }
+            }
+        }
+
+        false
+    }
 }
 
 impl<T: std::fmt::Debug> std::fmt::Debug for NFA<T> {
@@ -198,7 +231,7 @@ impl<T: std::fmt::Debug> std::fmt::Debug for NFA<T> {
                     write!(f, "{:?}", t)?;
 
                     if i < state.transitions.len() - 1 {
-                        write!(f, ", ");
+                        write!(f, ", ")?;
                     }
                 }
 
