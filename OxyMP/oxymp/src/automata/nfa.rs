@@ -1,9 +1,6 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt::Debug,
-};
+use std::collections::{HashMap, HashSet};
 
-// TODO: consistend naming: state_id for usize and state for State
+// TODO: consistent naming: state_id for usize and state for State
 
 use regex_syntax::{
     hir::{Class, ClassUnicode, Hir, HirKind, Literal, Repetition},
@@ -44,7 +41,10 @@ pub fn compile<'a>(regex: &str, tag: StateTag) -> NFACompileResult {
     let hir = parse(regex)?;
     let mut nfa = visit_hir(&hir)?;
 
-    if nfa.matches_empty_string() {
+    if nfa
+        .compute_epsilon_closure(vec![nfa.start_state()])
+        .contains(&nfa.end_state())
+    {
         return Err(NFACompileError::PatternMatchesEmptyString(
             regex.to_string(),
         ));
@@ -67,7 +67,7 @@ pub fn combine(nfas: Vec<NFA>) -> NFA {
         .collect();
 
     // reconnect dangling ending states of inner NFAs
-    let mut end_state = builder.create_state(StateKind::Accepting);
+    let mut end_state = builder.create_state(StateKind::Inherit);
     for end_state_ in end_states {
         builder.add_transition(end_state_, end_state, Transition::Epsilon);
     }
@@ -86,6 +86,7 @@ pub enum Transition {
 pub enum StateKind {
     NotAccepting,
     Accepting,
+    Inherit,
 }
 
 #[derive(Debug, Clone)]
@@ -103,10 +104,10 @@ pub struct State {
 }
 
 impl State {
-    fn new() -> Self {
+    fn new(kind: StateKind) -> Self {
         Self {
             transitions: Vec::new(),
-            kind: StateKind::NotAccepting,
+            kind,
             tag: StateTag::None,
         }
     }
@@ -143,6 +144,11 @@ impl NFA {
         self.end_state
     }
 
+    #[inline]
+    pub fn states(&self) -> &HashMap<usize, State> {
+        &self.states
+    }
+
     fn reindex_states(mut self, offset: usize) -> Self {
         self.end_state += offset;
 
@@ -174,6 +180,9 @@ impl NFA {
         self
     }
 
+    // TODO: create more of these assertions in the codebase
+    // TODO: not accepting states must not have a tag
+    // TODO: no epsilon self-loops
     fn assert_valid(&self) {
         assert!(
             self.states.contains_key(&self.start_state()),
@@ -220,39 +229,74 @@ impl NFA {
         }
     }
 
-    fn matches_empty_string(&self) -> bool {
-        let mut queue = VecDeque::new();
-        queue.push_back(self.start_state());
+    pub fn compute_epsilon_closure<I: IntoIterator<Item = usize>>(
+        &self,
+        starting_state_ids: I,
+    ) -> HashSet<usize> {
+        let mut state_ids = HashSet::new();
 
-        while let Some(state_id) = queue.pop_front() {
-            if state_id == self.end_state() {
-                return true;
+        let mut stack: Vec<_> = starting_state_ids.into_iter().collect();
+
+        while let Some(state_id) = stack.pop() {
+            state_ids.insert(state_id);
+
+            let state = self.states.get(&state_id).expect("state not found");
+
+            for (transition, next_state_id) in &state.transitions {
+                if !matches!(transition, Transition::Epsilon) || state_ids.contains(&*next_state_id)
+                {
+                    continue;
+                }
+
+                stack.push(*next_state_id);
             }
+        }
 
-            let Some(state) = self.states.get(&state_id) else {
-                continue;
-            };
+        state_ids
+    }
+
+    pub fn simulate_transition<'a, I: IntoIterator<Item = &'a usize>>(
+        &self,
+        starting_state_ids: I,
+        letter: char,
+    ) -> HashSet<usize> {
+        let mut state_ids = HashSet::new();
+
+        for state_id in starting_state_ids {
+            let state = self.states.get(&state_id).expect("state not found");
 
             for (transition, next_state_id) in &state.transitions {
                 match transition {
-                    Transition::Epsilon => queue.push_back(*next_state_id),
+                    Transition::Char(c) if *c == letter => {
+                        state_ids.insert(*next_state_id);
+                    }
+                    Transition::Chars { start, end } if *start <= letter && letter <= *end => {
+                        state_ids.insert(*next_state_id);
+                    }
                     _ => {}
                 }
             }
         }
 
-        false
+        state_ids
     }
 }
 
-impl Debug for NFA {
+impl std::fmt::Debug for NFA {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut state_ids: Vec<_> = self.states.keys().cloned().collect();
         state_ids.sort();
 
+        writeln!(f, "(NFA)")?;
+
         for state_id in state_ids {
             if let Some(state) = self.states.get(&state_id) {
-                write!(f, "State ({}:{:?}) {:?}: ", state_id, state.tag, state.kind)?;
+                write!(f, "State {} {:?} {:?}: ", state_id, state.tag, state.kind)?;
+
+                if state.transitions.is_empty() {
+                    writeln!(f, "∅")?;
+                    continue;
+                }
 
                 for (i, t) in state.transitions.iter().enumerate() {
                     write!(f, "{:?}", t)?;
@@ -270,7 +314,6 @@ impl Debug for NFA {
     }
 }
 
-#[derive(Clone)]
 struct NFABuilder {
     states: HashMap<usize, State>,
     state_id_counter: usize,
@@ -283,7 +326,7 @@ impl NFABuilder {
             states: HashMap::new(),
         };
 
-        let start_state = State::new();
+        let start_state = State::new(StateKind::NotAccepting);
         builder.states.insert(builder.start_state(), start_state);
 
         builder
@@ -300,12 +343,8 @@ impl NFABuilder {
     fn create_state(&mut self, kind: StateKind) -> usize {
         self.state_id_counter += 1;
         let id = self.state_id_counter;
-
-        let mut state = State::new();
-        state.kind = kind;
-
+        let state = State::new(kind);
         self.states.insert(id, state);
-
         id
     }
 
@@ -449,7 +488,7 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
         builder.append_nfa(state_before_loop, nfa);
         builder.add_transition(builder.end_state(), state_before_loop, Transition::Epsilon);
 
-        let end_state = builder.create_state(StateKind::Accepting);
+        let end_state = builder.create_state(StateKind::Inherit);
         builder.add_transition(state_before_loop, end_state, Transition::Epsilon);
     }
 
@@ -494,7 +533,7 @@ fn visit_alternation(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
         .collect::<Result<Vec<_>, _>>()?;
 
     // reconnect dangling ending states of inner NFAs
-    let mut end_state = builder.create_state(StateKind::Accepting);
+    let mut end_state = builder.create_state(StateKind::Inherit);
     for end_state_ in end_states {
         builder.add_transition(end_state_, end_state, Transition::Epsilon);
     }

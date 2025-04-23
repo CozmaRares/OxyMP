@@ -5,27 +5,30 @@ mod language {
     #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
-        #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
-        Number { value: f64 },
-
-        #[exact(r"\(")]
-        ParenLeft,
-
-        #[exact(r"\)")]
-        ParenRight,
-
-        #[exact(r"\+")]
-        Plus,
-
-        #[exact("-")]
-        Minus,
+        // #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
+        // Number { value: f64 },
+        //
+        // #[exact(r"\(")]
+        // ParenLeft,
+        //
+        // #[exact(r"\)")]
+        // ParenRight,
+        //
+        // #[exact(r"\+")]
+        // Plus,
+        //
+        // #[exact("-")]
+        // Minus,
 
         #[regex(r"[a-z]+", match_ident)]
         Ident(String),
+
+        #[exact("if")]
+        If,
     }
 
     #[oxymp::Lexer]
-    #[skip(r"[ \t]+")]
+    // #[skip(r"[ \t]+")]
     pub struct Lexer;
 
     //#[oxymp::RDParser]

@@ -16,7 +16,10 @@ mod utils;
 
 use syn::spanned::Spanned;
 
-use crate::{automata::nfa, data::process_module};
+use crate::{
+    automata::{dfa, nfa},
+    data::process_module,
+};
 
 fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let mut item_mod: syn::ItemMod = match syn::parse(item) {
@@ -62,7 +65,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         token_nfas.push(nfa);
     }
 
-    let mut lexer_nfas = Vec::new();
+    let mut lexer_dfas = Vec::new();
 
     for lexer_data in &data.lexers {
         let mut skip_nfas = Vec::new();
@@ -84,10 +87,12 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         skip_nfas.extend(token_nfas.clone());
 
         let lexer_nfa = nfa::combine(skip_nfas);
-        lexer_nfas.push(lexer_nfa);
+        eprintln!("{:#?}", lexer_nfa);
+        let lexer_dfa = dfa::compile(lexer_nfa);
+        let lexer_dfa = dfa::compress_char_classes(lexer_dfa);
+        eprintln!("{:#?}", lexer_dfa);
+        lexer_dfas.push(lexer_dfa);
     }
-
-    eprintln!("{:#?}", lexer_nfas);
 
     #[cfg(feature = "rd")]
     {
