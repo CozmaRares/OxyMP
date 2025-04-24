@@ -19,12 +19,15 @@ mod language {
         //
         // #[exact("-")]
         // Minus,
+        //
+        #[exact("if")]
+        If,
+
+        #[exact("i[a-z]")]
+        If2,
 
         #[regex(r"[a-z]+", match_ident)]
         Ident(String),
-
-        #[exact("if")]
-        If,
     }
 
     #[oxymp::Lexer]

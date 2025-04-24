@@ -108,10 +108,13 @@ pub struct TokenVariant {
     pub fields: syn::Fields,
 }
 
+// TODO: merge ident and ident_span
+// use syn::Ident
 #[derive(Debug)]
 pub struct TokensData {
     pub visibility: proc_macro2::TokenStream,
     pub ident: String,
+    pub ident_span: proc_macro2::Span,
     pub variants: Vec<TokenVariant>,
 }
 
@@ -240,6 +243,7 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
         Ok((
             TokensData {
                 ident: item_ident,
+                ident_span: item.ident.span(),
                 visibility,
                 variants,
             },

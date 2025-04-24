@@ -5,6 +5,8 @@
 // All APIs need docs!
 // #![deny(missing_docs)]
 
+// TODO: change all unwraps to expect where no explanation is needed
+
 #[macro_use]
 mod macros;
 
@@ -45,22 +47,29 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
 
     let mut token_nfas = Vec::new();
 
-    for variant in &data.tokens.variants {
+    // TODO: cache DFAs
+    for (idx, variant) in data.tokens.variants.iter().enumerate() {
         let pattern = match &variant.pattern {
             data::tokens::TokenPattern::Exact { pattern } => pattern.as_str(),
             data::tokens::TokenPattern::Regex { pattern, transform } => pattern.as_str(),
         };
 
-        let nfa =
-            nfa::compile(pattern, nfa::StateTag::Token(variant.ident.clone())).map_err(|e| {
-                syn::Error::new(
-                    variant.pattern_span,
-                    format!(
-                        "Error while compiling regex pattern for token variant '{}'\n{}",
-                        variant.ident, e
-                    ),
-                )
-            })?;
+        let nfa = nfa::compile(
+            pattern,
+            nfa::StateTag::Token {
+                variant: variant.ident.clone(),
+                priority: idx,
+            },
+        )
+        .map_err(|e| {
+            syn::Error::new(
+                variant.pattern_span,
+                format!(
+                    "Error while compiling regex pattern for token variant '{}'\n{}",
+                    variant.ident, e
+                ),
+            )
+        })?;
 
         token_nfas.push(nfa);
     }
@@ -71,7 +80,14 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         let mut skip_nfas = Vec::new();
 
         for (pattern, span) in &lexer_data.skip_patterns {
-            let nfa = nfa::compile(pattern, nfa::StateTag::Skip).map_err(|e| {
+            let nfa = nfa::compile(
+                pattern,
+                nfa::StateTag::Skip {
+                    lexer: lexer_data.ident.clone(),
+                    pattern: pattern.to_string(),
+                },
+            )
+            .map_err(|e| {
                 syn::Error::new(
                     *span,
                     format!(
@@ -87,9 +103,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         skip_nfas.extend(token_nfas.clone());
 
         let lexer_nfa = nfa::combine(skip_nfas);
-        eprintln!("{:#?}", lexer_nfa);
         let lexer_dfa = dfa::compile(lexer_nfa);
-        let lexer_dfa = dfa::compress_char_classes(lexer_dfa);
         eprintln!("{:#?}", lexer_dfa);
         lexer_dfas.push(lexer_dfa);
     }

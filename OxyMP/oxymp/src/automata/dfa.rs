@@ -2,12 +2,11 @@ use std::collections::{HashMap, HashSet};
 
 use super::nfa;
 
-// TODO: change all unwraps to expect (where no explanation is needed)
 pub fn compile(nfa: nfa::NFA) -> DFA {
     let alphabet = compute_alphabet(&nfa);
     let mut builder = DFABuilder::new(&nfa);
 
-    let nfa_starting_states = nfa.compute_epsilon_closure(vec![nfa.start_state()]);
+    let nfa_starting_states = nfa.compute_epsilon_closure([nfa.start_state()]);
     builder.create_state(nfa_starting_states);
 
     while !builder.unmarked_states.is_empty() {
@@ -38,14 +37,17 @@ pub fn compile(nfa: nfa::NFA) -> DFA {
         }
     }
 
-    builder.build()
+    let dfa = builder.build();
+    let dfa = minimize(dfa);
+    compress_char_classes(dfa)
 }
 
+// TODO:
 pub fn minimize(dfa: DFA) -> DFA {
-    todo!()
+    dfa
 }
 
-pub fn compress_char_classes(mut dfa: DFA) -> DFA {
+fn compress_char_classes(mut dfa: DFA) -> DFA {
     dfa.states = dfa
         .states
         .into_iter()
@@ -153,8 +155,8 @@ pub enum Transition {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StateTag {
-    Skip,
-    Token(String),
+    Skip { lexer: String, pattern: String },
+    Token { variant: String, priority: usize },
 }
 
 impl TryFrom<nfa::StateTag> for StateTag {
@@ -163,8 +165,8 @@ impl TryFrom<nfa::StateTag> for StateTag {
     fn try_from(value: nfa::StateTag) -> Result<Self, Self::Error> {
         match value {
             nfa::StateTag::None => Err(()),
-            nfa::StateTag::Token(token) => Ok(StateTag::Token(token)),
-            nfa::StateTag::Skip => Ok(StateTag::Skip),
+            nfa::StateTag::Token { variant, priority } => Ok(StateTag::Token { variant, priority }),
+            nfa::StateTag::Skip { lexer, pattern } => Ok(StateTag::Skip { lexer, pattern }),
         }
     }
 }
@@ -172,20 +174,30 @@ impl TryFrom<nfa::StateTag> for StateTag {
 #[derive(Debug, Clone)]
 pub enum StateKind {
     NotAccepting,
-    Accepting(HashSet<StateTag>),
+    Accepting(StateTag),
 }
 
 impl StateKind {
-    fn add_tag(self, tag: StateTag) -> Self {
-        let tags = match self {
-            StateKind::NotAccepting => HashSet::from([tag]),
-            StateKind::Accepting(mut tags) => {
-                tags.insert(tag);
-                tags
-            }
+    fn accept_if_higher_priority(self, new_tag: StateTag) -> Self {
+        let tag = match self {
+            StateKind::NotAccepting => new_tag,
+            StateKind::Accepting(current_tag) => match (&current_tag, &new_tag) {
+                (StateTag::Skip { .. }, StateTag::Token { .. }) => new_tag,
+                (
+                    StateTag::Token {
+                        priority: current_priority,
+                        ..
+                    },
+                    StateTag::Token {
+                        priority: new_priority,
+                        ..
+                    },
+                ) if *current_priority > *new_priority => new_tag,
+                _ => current_tag,
+            },
         };
 
-        StateKind::Accepting(tags)
+        StateKind::Accepting(tag)
     }
 }
 
@@ -311,7 +323,7 @@ impl<'a> DFABuilder<'a> {
                     .try_into()
                     .expect("NFA accepting state doesn't have a tag");
 
-                kind = kind.add_tag(tag);
+                kind = kind.accept_if_higher_priority(tag);
             }
         }
 
@@ -329,6 +341,7 @@ impl<'a> DFABuilder<'a> {
         }
     }
 
+    // FIX: this is not performant ~ O(n^3)
     fn get_equivalent_state(&self, nfa_equivalent_states: &HashSet<usize>) -> Option<usize> {
         for (id, state) in &self.states {
             if state.nfa_equivalent_states == *nfa_equivalent_states {

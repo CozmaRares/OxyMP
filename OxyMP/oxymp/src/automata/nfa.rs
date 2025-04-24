@@ -15,16 +15,19 @@ use crate::{
     utils::capitalize,
 };
 
+// TODO: report common regexes that are not supported
 #[derive(Debug, thiserror::Error)]
 pub enum UnsupportedFeature {
     #[error("empty pattern")]
     EmptyPattern,
-    #[error("lookahead pattern")]
+    #[error("lookahead pattern")] // ^, $
     LookaheadPattern,
     #[error("byte char class")]
     ByteCharClass,
 }
 
+// TODO: change these errors
+// users should not know about the automata
 #[derive(Debug, thiserror::Error)]
 pub enum NFACompileError {
     #[error("{}", capitalize(format!("{}", .0)))]
@@ -91,8 +94,8 @@ pub enum StateKind {
 
 #[derive(Debug, Clone)]
 pub enum StateTag {
-    Skip,
-    Token(String),
+    Skip { lexer: String, pattern: String },
+    Token { variant: String, priority: usize },
     None,
 }
 
@@ -180,6 +183,7 @@ impl NFA {
         self
     }
 
+    // THESE ERRORS SHOULD HAPPEN ONLY WHEN THE CODE IS INCORRECT
     // TODO: create more of these assertions in the codebase
     // TODO: not accepting states must not have a tag
     // TODO: no epsilon self-loops
