@@ -3,6 +3,24 @@
 #[oxymp::oxymp]
 mod language {
     #[derive(Debug)]
+    enum TokenizeError {
+        NumberParseError(std::num::ParseFloatError),
+    }
+
+    impl std::error::Error for TokenizeError {}
+    impl std::fmt::Display for TokenizeError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                TokenizeError::NumberParseError(e) => write!(f, "Number parse error: {}", e),
+            }
+        }
+    }
+
+    fn match_number(input: &str) -> Result<f64, TokenizeError> {
+        input.parse().map_err(TokenizeError::NumberParseError)
+    }
+
+    #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
         #[exact(r"[1-9][0-9]*(\.[0-9]+)?")]

@@ -42,6 +42,7 @@ pub struct MacroData {
     pub lr_parsers: Vec<LRParserData>,
 }
 
+// TODO: review how Polkadot does the outer macro pattern
 pub fn process_module(
     items: Vec<syn::Item>,
     mod_ident: &syn::Ident,
@@ -106,19 +107,19 @@ pub fn process_module(
             }
         }
 
-        let Some(attrs) = get_item_attrs(&item) else {
-            continue;
-        };
-
-        if let Some(attr) = has_attr_starting_with(attrs, OXYMP_ATTR) {
-            return Err(syn::Error::new(
+        if let Some(attrs) = get_item_attrs(&item) {
+            if let Some(attr) = has_attr_starting_with(attrs, OXYMP_ATTR) {
+                return Err(syn::Error::new(
                 attr.span(),
                 format!(
                     "Attribute #[{}], containing '{OXYMP_ATTR}', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.",
                     pretty_print_attr_path(attr.path())
                 )
             ));
+            }
         }
+
+        final_items.push(item);
     }
 
     if token_data.is_none() {
