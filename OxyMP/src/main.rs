@@ -5,33 +5,33 @@ mod language {
     #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
-        // #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
-        // Number { value: f64 },
-        //
-        // #[exact(r"\(")]
-        // ParenLeft,
-        //
-        // #[exact(r"\)")]
-        // ParenRight,
-        //
-        // #[exact(r"\+")]
-        // Plus,
-        //
-        // #[exact("-")]
-        // Minus,
-        //
+        #[exact(r"[1-9][0-9]*(\.[0-9]+)?")]
+        Number,
+
+        #[exact(r"\(")]
+        ParenLeft,
+
+        #[exact(r"\)")]
+        ParenRight,
+
+        #[exact(r"\+")]
+        Plus,
+
+        #[exact("-")]
+        Minus,
+
         #[exact("if")]
         If,
 
         #[exact("i[a-z]")]
         If2,
 
-        #[regex(r"[a-z]+", match_ident)]
-        Ident(String),
+        #[exact(r"[a-z]+")]
+        Ident,
     }
 
     #[oxymp::Lexer]
-    // #[skip(r"[ \t]+")]
+    #[skip(r"[ \t]+")]
     pub struct Lexer;
 
     //#[oxymp::RDParser]
@@ -40,9 +40,8 @@ mod language {
     //#[grammar(T = Number | r"\(" E r"\)")]
     //pub struct RDParser;
 }
+use language::*;
 
-//use language::*;
-//
 //impl _RDParser::E {
 //    pub fn visit(self) -> f64 {
 //        let (t, t1) = self.value();
@@ -74,6 +73,9 @@ mod language {
 //}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let input = "1    +2";
+    let tokens = Lexer::tokenize(input);
+    println!("{:#?}", tokens);
     //let r = RDParser::E(
     //    vec![
     //        Tok::Number { value: 1.0 },
