@@ -280,14 +280,14 @@ fn process_rules(
     let mut token_patterns: HashMap<String, String> = HashMap::new();
 
     for variant in &tokens_data.variants {
-        known_names.insert(variant.ident.clone(), NameType::Token);
+        known_names.insert(variant.ident.to_string(), NameType::Token);
 
         let pattern = match &variant.pattern {
             TokenPattern::Exact { pattern } => pattern,
             TokenPattern::Regex { pattern, .. } => pattern,
         }
         .clone();
-        token_patterns.insert(pattern, variant.ident.clone());
+        token_patterns.insert(pattern, variant.ident.to_string());
     }
 
     for rule in &raw_rules {

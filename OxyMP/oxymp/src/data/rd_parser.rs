@@ -6,7 +6,7 @@ use super::{grammar::GrammarData, processor::ItemProcessor};
 #[derive(Debug)]
 pub struct RDParserData {
     pub visibility: proc_macro2::TokenStream,
-    pub ident: String,
+    pub ident: syn::Ident,
     pub grammar_rules: Vec<GrammarData>,
 }
 
@@ -59,7 +59,7 @@ impl ItemProcessor<RDParserData, syn::ItemStruct> for RDParserProcessor {
 
         Ok((
             RDParserData {
-                ident: ident.to_string(),
+                ident,
                 visibility,
                 grammar_rules,
             },

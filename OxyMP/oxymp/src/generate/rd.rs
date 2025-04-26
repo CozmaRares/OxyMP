@@ -16,11 +16,12 @@ pub fn generate_mod(tokens_data: &TokensData, rd_data: RDParserData) -> syn::Res
     let ast = generate_ast(&tokens_data.ident, &rules);
     let parser = generate_parser(&rules);
 
-    let tokens_ident = format_ident!("{}", tokens_data.ident);
-    let parser_ident = format_ident!("{}", rd_data.ident);
+    let tokens_ident = &tokens_data.ident;
+    let parser_ident = &rd_data.ident;
 
     let mod_ident = format_ident!("_{}", rd_data.ident);
     let mod_item: syn::ItemMod = pq! {
+        #[allow(non_snake_case)]
         #vis mod #mod_ident {
             use super::*;
 
@@ -66,7 +67,7 @@ pub fn generate_mod(tokens_data: &TokensData, rd_data: RDParserData) -> syn::Res
     Ok(syn::Item::Mod(mod_item))
 }
 
-fn generate_ast(tokens_ident: &String, rules: &Vec<GrammarRule>) -> TokenStream {
+fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStream {
     let structs = rules.iter().map(|GrammarRule { name, node }| {
         let ASTNode {
             main_struct,
@@ -113,7 +114,7 @@ struct ASTNode {
     external_choices: Option<Vec<TokenStream>>,
 }
 
-fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &String) -> ASTNode {
+fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Ident) -> ASTNode {
     match &node {
         GrammarNode::Rule(rule) => {
             let ident = format_ident!("{}", rule);

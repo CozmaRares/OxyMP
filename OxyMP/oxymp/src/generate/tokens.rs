@@ -5,27 +5,24 @@ use crate::{
     utils::split_iter,
 };
 
-pub fn generate_structs(data: &TokensData) -> impl IntoIterator<Item = syn::Item> + '_ {
-    let mut structs: Vec<_> = data
+pub fn generate_structs(data: &TokensData) -> impl Iterator<Item = syn::Item> + '_ {
+    let mut structs = data
         .variants
         .iter()
         .map(|variant| generate_struct(&data.ident, &data.visibility, variant))
-        .map(syn::Item::Struct)
-        .collect();
+        .map(syn::Item::Struct);
 
-    let impls: Vec<_> = data
+    let impls = data
         .variants
         .iter()
         .map(|variant| generate_try_from(&data.ident, variant))
-        .map(syn::Item::Impl)
-        .collect();
+        .map(syn::Item::Impl);
 
-    structs.extend(impls);
-    structs
+    structs.chain(impls)
 }
 
 fn generate_struct(
-    tokens_ident: &String,
+    tokens_ident: &syn::Ident,
     visibility: &proc_macro2::TokenStream,
     variant: &TokenVariant,
 ) -> syn::ItemStruct {
@@ -35,8 +32,6 @@ fn generate_struct(
         ..
     } = variant;
 
-    let tokens_ident = format_ident!("{}", tokens_ident);
-    let variant_ident = format_ident!("{}", variant_ident);
     let struct_ident = format_ident!("{}{}", tokens_ident, variant_ident);
 
     let pub_fields = match fields {
@@ -69,15 +64,13 @@ fn generate_struct(
     }
 }
 
-fn generate_try_from(tokens_ident: &String, variant: &TokenVariant) -> syn::ItemImpl {
+fn generate_try_from(tokens_ident: &syn::Ident, variant: &TokenVariant) -> syn::ItemImpl {
     let TokenVariant {
         ident: variant_ident,
         fields,
         ..
     } = variant;
 
-    let tokens_ident = format_ident!("{}", tokens_ident);
-    let variant_ident = format_ident!("{}", variant_ident);
     let struct_ident = format_ident!("{}{}", tokens_ident, variant_ident);
 
     let (fields_stream, fields_cloned) = match fields {
@@ -104,13 +97,6 @@ fn generate_try_from(tokens_ident: &String, variant: &TokenVariant) -> syn::Item
 
     pq! {
         impl #struct_ident {
-            fn try_from(value: #tokens_ident) -> Option<Self> {
-                match value {
-                    #tokens_ident::#variant_ident #fields_stream => Some(Self #fields_stream),
-                    _ => None,
-                }
-            }
-
             fn try_from_ref(value: &#tokens_ident) -> Option<Self> {
                 match value {
                     #tokens_ident::#variant_ident #fields_stream => Some(Self #fields_cloned),

@@ -57,7 +57,7 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         let nfa = nfa::compile(
             pattern,
             nfa::StateTag::Token {
-                variant: variant.ident.clone(),
+                variant: variant.ident.to_string(),
                 priority: idx,
             },
         )
@@ -74,22 +74,21 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
         token_nfas.push(nfa);
     }
 
-    let mut lexer_dfas = Vec::new();
-
-    for lexer_data in &data.lexers {
+    for lexer_data in data.lexers {
         let mut skip_nfas = Vec::new();
 
-        for (pattern, span) in &lexer_data.skip_patterns {
+        for pattern_lit in &lexer_data.skip_patterns {
+            let pattern = pattern_lit.value();
             let nfa = nfa::compile(
-                pattern,
+                &pattern,
                 nfa::StateTag::Skip {
-                    lexer: lexer_data.ident.clone(),
-                    pattern: pattern.to_string(),
+                    lexer: lexer_data.ident.to_string(),
+                    pattern: pattern.clone(),
                 },
             )
             .map_err(|e| {
                 syn::Error::new(
-                    *span,
+                    pattern_lit.span(),
                     format!(
                         "Error while compiling regex pattern for skip pattern '{}'\n{}",
                         pattern, e
@@ -100,12 +99,12 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
             skip_nfas.push(nfa);
         }
 
-        skip_nfas.extend(token_nfas.clone());
+        let nfas = [skip_nfas, token_nfas.clone()].concat();
+        let nfa = nfa::combine(nfas);
+        let dfa = dfa::compile(nfa);
 
-        let lexer_nfa = nfa::combine(skip_nfas);
-        let lexer_dfa = dfa::compile(lexer_nfa);
-        eprintln!("{:#?}", lexer_dfa);
-        lexer_dfas.push(lexer_dfa);
+        let generated_items = generate::lexer::generate(&data.tokens, lexer_data, dfa)?;
+        items.extend(generated_items);
     }
 
     #[cfg(feature = "rd")]

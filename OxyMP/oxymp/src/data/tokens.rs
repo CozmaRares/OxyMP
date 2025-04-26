@@ -101,20 +101,16 @@ impl TokenPattern {
 
 #[derive(Debug)]
 pub struct TokenVariant {
-    pub ident: String,
-    pub ident_span: proc_macro2::Span,
+    pub ident: syn::Ident,
     pub pattern: TokenPattern,
     pub pattern_span: proc_macro2::Span,
     pub fields: syn::Fields,
 }
 
-// TODO: merge ident and ident_span
-// use syn::Ident
 #[derive(Debug)]
 pub struct TokensData {
     pub visibility: proc_macro2::TokenStream,
-    pub ident: String,
-    pub ident_span: proc_macro2::Span,
+    pub ident: syn::Ident,
     pub variants: Vec<TokenVariant>,
 }
 
@@ -148,7 +144,7 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
         }
 
         let visibility = item.vis.to_token_stream();
-        let item_ident = item.ident.to_string();
+        let item_ident = item.ident.clone();
 
         let mut variants = Vec::new();
         let mut modified_variants = Vec::new();
@@ -224,8 +220,7 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
             }?;
 
             variants.push(TokenVariant {
-                ident: ident.to_string(),
-                ident_span: ident.span(),
+                ident: ident.clone(),
                 pattern,
                 pattern_span: pattern_span.expect("pattern_span should always be Some"),
                 fields: fields.clone(),
@@ -243,7 +238,6 @@ impl ItemProcessor<TokensData, syn::ItemEnum> for TokensProcessor {
         Ok((
             TokensData {
                 ident: item_ident,
-                ident_span: item.ident.span(),
                 visibility,
                 variants,
             },

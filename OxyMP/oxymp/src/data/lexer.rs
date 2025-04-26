@@ -5,8 +5,8 @@ use super::processor::ItemProcessor;
 #[derive(Debug)]
 pub struct LexerData {
     pub visibility: proc_macro2::TokenStream,
-    pub ident: String,
-    pub skip_patterns: Vec<(String, proc_macro2::Span)>,
+    pub ident: syn::Ident,
+    pub skip_patterns: Vec<syn::LitStr>,
 }
 
 pub(super) struct LexerProcessor;
@@ -44,7 +44,7 @@ impl ItemProcessor<LexerData, syn::ItemStruct> for LexerProcessor {
 
             if path.is_ident("skip") {
                 let skip_attr: SkipAttr = attr.parse_args()?;
-                skip_patterns.push(skip_attr.into());
+                skip_patterns.push(skip_attr.0);
             } else {
                 attributes.push(attr);
             }
@@ -54,7 +54,7 @@ impl ItemProcessor<LexerData, syn::ItemStruct> for LexerProcessor {
 
         Ok((
             LexerData {
-                ident: ident.to_string(),
+                ident,
                 visibility,
                 skip_patterns,
             },
@@ -63,7 +63,7 @@ impl ItemProcessor<LexerData, syn::ItemStruct> for LexerProcessor {
     }
 }
 
-struct SkipAttr(String, proc_macro2::Span);
+struct SkipAttr(syn::LitStr);
 
 impl syn::parse::Parse for SkipAttr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<SkipAttr> {
@@ -76,12 +76,6 @@ impl syn::parse::Parse for SkipAttr {
             ));
         }
 
-        Ok(SkipAttr(pattern.value(), pattern.span()))
-    }
-}
-
-impl From<SkipAttr> for (String, proc_macro2::Span) {
-    fn from(skip_attr: SkipAttr) -> Self {
-        (skip_attr.0, skip_attr.1)
+        Ok(SkipAttr(pattern))
     }
 }
