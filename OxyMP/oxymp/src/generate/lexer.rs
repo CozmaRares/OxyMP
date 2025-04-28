@@ -11,24 +11,36 @@ use crate::{
         lexer::LexerData,
         tokens::{TokenPattern, TokensData},
     },
-    utils::split_iter,
 };
 
-pub fn generate_error_struct() -> [syn::Item; 5] {
+pub fn generate_error_struct() -> Vec<syn::Item> {
     let expected_enum: syn::ItemEnum = pq! {
         #[derive(Debug)]
         pub enum LexerExpected {
             Char(char),
-            Range { start: char, end: char },
+            CharRange { start: char, end: char },
         }
     };
 
-    let expected_impl: syn::ItemImpl = pq! {
+    let expected_display: syn::ItemImpl = pq! {
         impl std::fmt::Display for LexerExpected {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let print_char = |f: &mut std::fmt::Formatter<'_>, c: &char| {
+                    if c.is_whitespace() {
+                        write!(f, "whitespace(code {})", *c as usize)
+                    }
+                    else {
+                        write!(f, "'{}", c)
+                    }
+                };
+
                 match self {
-                    LexerExpected::Char(c) => write!(f, "'{}'", c),
-                    LexerExpected::Range { start, end } => write!(f, "'{}'..='{}'", start, end),
+                    LexerExpected::Char(c) => print_char(f, c),
+                    LexerExpected::CharRange { start, end } => {
+                        print_char(f, start)?;
+                        write!(f, "..=")?;
+                        print_char(f, end)
+                    }
                 }
             }
         }
@@ -36,6 +48,8 @@ pub fn generate_error_struct() -> [syn::Item; 5] {
 
     let error_enum: syn::ItemEnum = pq! {
         // TODO: add location
+        // needs refactor of accept fns
+        // accept and reject
         #[derive(Debug)]
         pub enum LexerError {
             Native {
@@ -46,7 +60,7 @@ pub fn generate_error_struct() -> [syn::Item; 5] {
         }
     };
 
-    let error_error_impl: syn::ItemImpl = pq! {
+    let error_error: syn::ItemImpl = pq! {
         impl std::error::Error for LexerError {}
     };
 
@@ -75,11 +89,11 @@ pub fn generate_error_struct() -> [syn::Item; 5] {
         }
     };
 
-    [
+    vec![
         syn::Item::Enum(expected_enum),
-        syn::Item::Impl(expected_impl),
+        syn::Item::Impl(expected_display),
         syn::Item::Enum(error_enum),
-        syn::Item::Impl(error_error_impl),
+        syn::Item::Impl(error_error),
         syn::Item::Impl(error_display),
     ]
 }
@@ -149,7 +163,7 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
         .map(|ident| q! { _internal_oxymp_LexerState::#ident => #ident::transition(c), });
     let accept_branches = idents
         .iter()
-        .map(|ident| q! { _internal_oxymp_LexerState::#ident => #ident::accept(inp), });
+        .map(|ident| q! { _internal_oxymp_LexerState::#ident => #ident::accept(inp, c), });
 
     q! {
         #[derive(Debug)]
@@ -166,7 +180,7 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
                 }
             }
 
-            pub(super) fn accept(&self, inp: &str) -> Result<Option<_internal_oxymp_Token>, LexerError> {
+            pub(super) fn accept(&self, inp: &str, c: char) -> Result<Option<_internal_oxymp_Token>, LexerError> {
                 match self {
                     #(#accept_branches)*
                 }
@@ -191,13 +205,28 @@ fn generate_state_methods<'a>(
         });
 
         let accept = match &state.kind {
-            DFAStateKind::NotAccepting => q! {
-                    // TODO:
-                    Err(LexerError::Native {
-                        unexpected_char: inp.chars().next().unwrap(),
-                        expected: vec![],
-                    })
-            },
+            DFAStateKind::NotAccepting => {
+                let expected = state
+                    .transitions
+                    .iter()
+                    .map(|(transition, _)| match transition {
+                        DFATransition::Char(c) => q! {
+                            LexerExpected::Char(#c)
+                        },
+                        DFATransition::Chars { start, end } => q! {
+                            LexerExpected::CharRange{ start: #start, end: #end }
+                        },
+                    });
+
+                q! {
+                    Err(
+                        LexerError::Native {
+                            unexpected_char: current_char,
+                            expected: vec![ #(#expected),* ]
+                        }
+                    )
+                }
+            }
             DFAStateKind::Accepting(tag) => match tag {
                 DFAStateTag::Token { variant, priority } => {
                     let transform = token_transforms
@@ -220,7 +249,7 @@ fn generate_state_methods<'a>(
                     }
                 }
 
-                fn accept(inp: &str) -> Result<Option<_internal_oxymp_Token>, LexerError> {
+                fn accept(inp: &str, current_char: char) -> Result<Option<_internal_oxymp_Token>, LexerError> {
                     #accept
                 }
             }
@@ -250,8 +279,8 @@ fn generate_tokenize_impl(
                             iter.next();
                         }
                         None => {
-                            if let Some(tok) = state.accept(&inp[match_start..*current_index])? {
-                                toks.push(tok);
+                            if let Some(tok) = state.accept(&inp[match_start..*current_index], *c)? {
+                                toks.push(tok)
                             }
                             state = _Lexer::_internal_oxymp_LexerState::_1;
                             match_start = *current_index;
@@ -259,8 +288,10 @@ fn generate_tokenize_impl(
                     }
                 }
 
-                if let Some(tok) = state.accept(&inp[match_start..])? {
-                    toks.push(tok);
+                if inp.len() > 0 {
+                    if let Some(tok) = state.accept(&inp[match_start..], inp.chars().last().unwrap())? {
+                        toks.push(tok)
+                    }
                 }
 
                 Ok(toks)

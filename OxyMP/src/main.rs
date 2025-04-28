@@ -67,9 +67,15 @@ mod language {
 use language::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let input = "1    +2 if ia ifff";
-    let tokens = Lexer::tokenize(input)?;
-    println!("{:#?}", tokens);
+    let input = "0 1    +2 if ia ifff";
+    let r = Lexer::tokenize(input);
+
+    match r {
+        Err(e) => eprintln!("{e}"),
+        Ok(t) => println!("{:#?}", t),
+    }
+
+    // println!("{:#?}", tokens);
     // let r = RDParser::E(tokens.into()).unwrap().1;
     // eprintln!("{:#?}", r.visit());
 

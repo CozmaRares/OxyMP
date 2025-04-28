@@ -6,6 +6,7 @@
 // #![deny(missing_docs)]
 
 // TODO: change all unwraps to expect where no explanation is needed
+// TODO: create a 'symbols' module with all the symbols used for the std lib
 
 #[macro_use]
 mod macros;

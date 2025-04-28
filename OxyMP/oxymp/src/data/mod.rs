@@ -82,6 +82,7 @@ pub fn process_module(
             ItemProcessResult::Err(error) => return Err(error),
         }
 
+        // TODO: refactor lexers and parsers should be modules
         let res = process_item(LexerProcessor, &item);
         match res {
             ItemProcessResult::Ignore => {}

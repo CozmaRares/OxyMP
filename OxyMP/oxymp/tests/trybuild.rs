@@ -1,3 +1,7 @@
+// TODO: remove 'trybuild' dependency and implement a paralelizable one
+// see polkadot-sdk/substrate/frame/support/procedural/src/pallet/parse/tests/mod.rs, lines 115 & 155
+// see 'trybuild' implementation for how they check error messages
+
 const TESTS_DIR: &'static str = "tests/trybuild";
 
 type TestPaths = Vec<&'static str>;
