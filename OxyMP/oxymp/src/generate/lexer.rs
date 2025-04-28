@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use quote::format_ident;
 
 use crate::{
@@ -5,9 +7,82 @@ use crate::{
         State as DFAState, StateKind as DFAStateKind, StateTag as DFAStateTag,
         Transition as DFATransition, DFA,
     },
-    data::{lexer::LexerData, tokens::TokensData},
+    data::{
+        lexer::LexerData,
+        tokens::{TokenPattern, TokensData},
+    },
     utils::split_iter,
 };
+
+pub fn generate_error_struct() -> [syn::Item; 5] {
+    let expected_enum: syn::ItemEnum = pq! {
+        #[derive(Debug)]
+        pub enum LexerExpected {
+            Char(char),
+            Range { start: char, end: char },
+        }
+    };
+
+    let expected_impl: syn::ItemImpl = pq! {
+        impl std::fmt::Display for LexerExpected {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    LexerExpected::Char(c) => write!(f, "'{}'", c),
+                    LexerExpected::Range { start, end } => write!(f, "'{}'..='{}'", start, end),
+                }
+            }
+        }
+    };
+
+    let error_enum: syn::ItemEnum = pq! {
+        // TODO: add location
+        #[derive(Debug)]
+        pub enum LexerError {
+            Native {
+                unexpected_char: char,
+                expected: Vec<LexerExpected>,
+            },
+            UserTransform(Box<dyn std::error::Error>),
+        }
+    };
+
+    let error_error_impl: syn::ItemImpl = pq! {
+        impl std::error::Error for LexerError {}
+    };
+
+    let error_display: syn::ItemImpl = pq! {
+        impl std::fmt::Display for LexerError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    LexerError::Native {
+                        unexpected_char,
+                        expected,
+                    } => {
+                        let expected = expected
+                            .iter()
+                            .map(|expected| format!("{}", expected))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        write!(
+                            f,
+                            "Unexpected character '{}'\nExpected: {}",
+                            unexpected_char, expected
+                        )
+                    }
+                    LexerError::UserTransform(e) => write!(f, "User transform error: {}", e),
+                }
+            }
+        }
+    };
+
+    [
+        syn::Item::Enum(expected_enum),
+        syn::Item::Impl(expected_impl),
+        syn::Item::Enum(error_enum),
+        syn::Item::Impl(error_error_impl),
+        syn::Item::Impl(error_display),
+    ]
+}
 
 pub fn generate(
     tokens_data: &TokensData,
@@ -18,7 +93,28 @@ pub fn generate(
         generate_tokenize_impl(&tokens_data.ident, &lexer_data.ident, lexer_data.visibility);
 
     let states = generate_states(&dfa);
-    let methods = generate_state_methods(&dfa, tokens_data);
+
+    let tokens_ident = &tokens_data.ident;
+    let token_transforms = tokens_data
+        .variants
+        .iter()
+        .map(|variant| {
+            let variant_ident = variant.ident.clone();
+            let ident = variant.ident.to_string();
+
+            let transform = match &variant.pattern {
+                TokenPattern::Exact { .. } => q! { #tokens_ident::#variant_ident },
+                TokenPattern::Regex { transform, .. } => q! {
+                    #transform(inp)
+                        .map_err(|e| LexerError::UserTransform(Box::new(e)))?
+                },
+            };
+
+            (ident, transform)
+        })
+        .collect();
+
+    let methods = generate_state_methods(&dfa, &tokens_data.ident, &token_transforms);
 
     let tokens_ident = &tokens_data.ident;
     let lexer_ident = &lexer_data.ident;
@@ -70,7 +166,7 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
                 }
             }
 
-            pub(super) fn accept(&self, inp: &str) -> Result<Option<_internal_oxymp_Token>, String> {
+            pub(super) fn accept(&self, inp: &str) -> Result<Option<_internal_oxymp_Token>, LexerError> {
                 match self {
                     #(#accept_branches)*
                 }
@@ -81,9 +177,10 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
 
 fn generate_state_methods<'a>(
     dfa: &'a DFA,
-    tokens_data: &'a TokensData,
+    tokens_ident: &'a syn::Ident,
+    token_transforms: &'a HashMap<String, proc_macro2::TokenStream>,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
-    dfa.states().iter().map(|(state_id, state)| {
+    dfa.states().iter().map(move |(state_id, state)| {
         let transition_branches = state.transitions.iter().map(|(transition, target)| {
             let target = format_ident!("_{}", target);
             let target = q! { Some(_internal_oxymp_LexerState::#target) };
@@ -93,19 +190,20 @@ fn generate_state_methods<'a>(
             }
         });
 
-        let tokens_ident = &tokens_data.ident;
         let accept = match &state.kind {
-            DFAStateKind::NotAccepting => {
-                // TODO: return a proper error that implements Error
-                // also specify what characters were expected
-                // include current slice in the input, maybe max 10 chars, maybe also include
-                // before chars and have a ^ below the unexpected char
-                q! { Err(format!("Unexpected character '{}'", inp.chars().next().unwrap())) }
-            }
+            DFAStateKind::NotAccepting => q! {
+                    // TODO:
+                    Err(LexerError::Native {
+                        unexpected_char: inp.chars().next().unwrap(),
+                        expected: vec![],
+                    })
+            },
             DFAStateKind::Accepting(tag) => match tag {
                 DFAStateTag::Token { variant, priority } => {
-                    let variant_ident = format_ident!("{}", variant);
-                    q! { Ok(Some(#tokens_ident::#variant_ident)) }
+                    let transform = token_transforms
+                        .get(variant)
+                        .expect("token pattern should always have an transform");
+                    q! { Ok(Some(#transform)) }
                 }
                 DFAStateTag::Skip { lexer, pattern } => q! { Ok(None) },
             },
@@ -122,7 +220,7 @@ fn generate_state_methods<'a>(
                     }
                 }
 
-                fn accept(inp: &str) -> Result<Option<_internal_oxymp_Token>, String> {
+                fn accept(inp: &str) -> Result<Option<_internal_oxymp_Token>, LexerError> {
                     #accept
                 }
             }
@@ -139,7 +237,7 @@ fn generate_tokenize_impl(
 
     pq! {
         impl #lexer_ident {
-            #vis fn tokenize(inp: &str) -> Result<Vec<#tokens_ident>, String> {
+            #vis fn tokenize(inp: &str) -> Result<Vec<#tokens_ident>, LexerError> {
                 let mut toks = Vec::new();
                 let mut state = _Lexer::_internal_oxymp_LexerState::_1;
                 let mut match_start = 0;

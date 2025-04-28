@@ -47,6 +47,10 @@ fn oxymp_impl(item: proc_macro::TokenStream) -> syn::Result<proc_macro2::TokenSt
 
     let mut token_nfas = Vec::new();
 
+    if !data.lexers.is_empty() {
+        items.extend(generate::lexer::generate_error_struct());
+    }
+
     // TODO: cache DFAs
     for (idx, variant) in data.tokens.variants.iter().enumerate() {
         let pattern = match &variant.pattern {
