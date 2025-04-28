@@ -1,6 +1,7 @@
-pub mod tokens;
+use crate::data::Data;
 
-pub mod lexer;
+pub fn generate(data: Data) -> syn::Result<proc_macro2::TokenStream> {
+    let module = data.initial_module;
 
-#[cfg(feature = "rd")]
-pub mod rd;
+    Ok(q! { #module })
+}

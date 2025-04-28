@@ -1,3 +1,15 @@
+use std::any::Any;
+
+pub fn extract_panic_message(e: &Box<dyn Any + Send + 'static>) -> Option<String> {
+    if let Some(s) = e.downcast_ref::<String>() {
+        Some(s.clone())
+    } else if let Some(s) = e.downcast_ref::<&str>() {
+        Some(s.to_string())
+    } else {
+        None
+    }
+}
+
 macro_rules! pq {
     () => { ::syn::parse_quote!() };
     ($($tt:tt)*) => {
@@ -13,7 +25,7 @@ macro_rules! pq {
                         file!(),
                         line!(),
                     );
-                    let msg = crate::utils::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
+                    let msg = crate::macros::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
                     panic!("{}", msg);
                 }
             }
@@ -37,7 +49,7 @@ macro_rules! q {
                         file!(),
                         line!(),
                     );
-                    let msg = crate::utils::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
+                    let msg = crate::macros::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
                     panic!("{}", msg);
                 }
             }
