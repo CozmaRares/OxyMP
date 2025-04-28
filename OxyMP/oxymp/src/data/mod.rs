@@ -1,11 +1,13 @@
 use syn::spanned::Spanned;
 
 mod helpers;
+pub mod tokens;
 
-use helpers::{AttrError, OxyMPAttr};
+use helpers::{MarkerAttrError, OxyMPAttr};
 
+#[derive(Debug)]
 pub struct Data {
-    pub tokens: (),
+    pub tokens: tokens::TokensData,
     pub lexers: Vec<()>,
 
     #[cfg(feature = "rd")]
@@ -29,6 +31,8 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
         ));
     };
 
+    let mut tokens = Vec::new();
+
     for item in &mut items {
         let Some((oxymp_attr, span)) = helpers::remove_first_oxymp_attr(item)? else {
             continue;
@@ -42,7 +46,7 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
                 attr_spans.push(span);
             }
 
-            let err = AttrError::MoreAttrs {
+            let err = MarkerAttrError::MoreAttrs {
                 item_span: helpers::get_ident_span(item),
                 attr_spans,
             };
@@ -51,7 +55,10 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
         }
 
         match oxymp_attr {
-            OxyMPAttr::Tokens => {}
+            OxyMPAttr::Tokens => {
+                let data = tokens::process_tokens(item)?;
+                tokens.push((data, helpers::get_item_ds_span(item)));
+            }
             OxyMPAttr::Lexer => {}
 
             #[cfg(feature = "rd")]
@@ -62,10 +69,33 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
         }
     }
 
+    match tokens.len() {
+        0 => {
+            let msg =
+                "Module marked with #[oxymp] must contain one enum marked with #[oxymp::Tokens].";
+            return Err(syn::Error::new(module.ident.span(), msg));
+        }
+
+        1 => {}
+
+        _ => {
+            let msg = "Module marked with #[oxymp] must contain only one enum marked with #[oxymp::Tokens].";
+            let mut iter = tokens.into_iter();
+            let first = syn::Error::new(iter.next().expect("has at least 2 tokens").1, msg);
+
+            let err = iter.fold(first, |mut acc, (_, span)| {
+                acc.combine(syn::Error::new(span, "new token target found here"));
+                acc
+            });
+
+            return Err(err);
+        }
+    }
+
     module.content = Some((brace, items));
 
     Ok(Data {
-        tokens: (),
+        tokens: tokens.pop().expect("has one token").0,
         lexers: Vec::new(),
 
         #[cfg(feature = "rd")]

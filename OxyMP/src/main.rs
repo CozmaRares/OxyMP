@@ -2,59 +2,55 @@
 
 #[oxymp::oxymp]
 mod language {
-    // #[derive(Debug)]
-    // enum TokenizeError {
-    //     NumberParseError(std::num::ParseFloatError),
-    // }
-    //
-    // impl std::error::Error for TokenizeError {}
-    // impl std::fmt::Display for TokenizeError {
-    //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    //         match self {
-    //             TokenizeError::NumberParseError(e) => write!(f, "Number parse error: {}", e),
-    //         }
-    //     }
-    // }
-    //
-    // fn match_number(input: &str) -> Result<Tok, TokenizeError> {
-    //     input
-    //         .parse()
-    //         .map(|t| Tok::Number { value: t })
-    //         .map_err(TokenizeError::NumberParseError)
-    // }
-    //
-    // fn match_ident(input: &str) -> Result<Tok, TokenizeError> {
-    //     Ok(Tok::Ident(input.to_string()))
-    // }
+    #[derive(Debug)]
+    enum TokenizeError {
+        NumberParseError(std::num::ParseFloatError),
+    }
+
+    impl std::error::Error for TokenizeError {}
+    impl std::fmt::Display for TokenizeError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                TokenizeError::NumberParseError(e) => write!(f, "Number parse error: {}", e),
+            }
+        }
+    }
+
+    fn match_number(input: &str) -> Result<Tok, TokenizeError> {
+        input
+            .parse()
+            .map(|t| Tok::Number { value: t })
+            .map_err(TokenizeError::NumberParseError)
+    }
+
+    fn match_ident(input: &str) -> Result<Tok, TokenizeError> {
+        Ok(Tok::Ident(input.to_string()))
+    }
 
     #[derive(Debug)]
     #[oxymp::Tokens]
-    #[oxymp::Tokens]
-    #[oxymp::Tokens]
-    #[oxymp::Tokens]
-    #[oxymp::Tokens]
     pub enum Tok {
-        // #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
+        #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
         Number { value: f64 },
-        // #[exact(r"\(")]
-        // ParenLeft,
-        //
-        // #[exact(r"\)")]
-        // ParenRight,
-        //
-        // #[exact(r"\+")]
-        // Plus,
-        //
-        // #[exact("-")]
-        // Minus,
-        // #[exact("if")]
-        // If,
-        //
-        // #[exact("i[a-z]")]
-        // If2,
-        //
-        // #[regex(r"[a-z]+", match_ident)]
-        // Ident(String),
+        #[exact(r"\(")]
+        ParenLeft,
+
+        #[exact(r"\)")]
+        ParenRight,
+
+        #[exact(r"\+")]
+        Plus,
+
+        #[exact("-")]
+        Minus,
+        #[exact("if")]
+        If,
+
+        #[exact("i[a-z]")]
+        If2,
+
+        #[regex(r"[a-z]+", match_ident)]
+        Ident(String),
     }
 
     #[oxymp::Lexer]

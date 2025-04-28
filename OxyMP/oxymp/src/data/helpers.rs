@@ -2,39 +2,54 @@ use proc_macro2::Span;
 use syn::spanned::Spanned;
 
 pub enum AttrError {
-    UnknowAttr(Span),
-    MoreAttrs {
-        item_span: Span,
-        attr_spans: Vec<Span>,
-    },
-    Not2Segments(Span),
     PathArg(Span),
-    Multi(Vec<AttrError>),
+    SegmentError { span: Span, msg: &'static str },
 }
 
-impl AttrError {
-    fn add(self, other: Self) -> Self {
-        let errs = match self {
-            Self::Multi(mut errs) => {
-                errs.push(other);
-                errs
-            }
-            this => vec![this, other],
-        };
-        Self::Multi(errs)
+impl From<AttrError> for MarkerAttrError {
+    fn from(value: AttrError) -> MarkerAttrError {
+        MarkerAttrError::AttrSyntax(value)
+    }
+}
+
+impl From<Vec<AttrError>> for MarkerAttrError {
+    fn from(value: Vec<AttrError>) -> MarkerAttrError {
+        MarkerAttrError::Multi(value.into_iter().map(Into::into).collect())
     }
 }
 
 impl From<AttrError> for syn::Error {
     fn from(value: AttrError) -> Self {
         match value {
-            AttrError::UnknowAttr(span) => {
+            AttrError::PathArg(span) => {
+                let msg = "Generics in path arguments are not allowed. Please remove them.";
+                Self::new(span, msg)
+            }
+            AttrError::SegmentError { span, msg } => Self::new(span, msg),
+        }
+    }
+}
+
+pub enum MarkerAttrError {
+    UnknowAttr(Span),
+    MoreAttrs {
+        item_span: Span,
+        attr_spans: Vec<Span>,
+    },
+    AttrSyntax(AttrError),
+    Multi(Vec<MarkerAttrError>),
+}
+
+impl From<MarkerAttrError> for syn::Error {
+    fn from(value: MarkerAttrError) -> Self {
+        match value {
+            MarkerAttrError::UnknowAttr(span) => {
                 let msg = "Attribute containing 'oxymp', is not supported. Make sure you spelled it correctly, or have enabled the corresponding feature.";
 
                 Self::new(span, msg)
             }
 
-            AttrError::MoreAttrs {
+            MarkerAttrError::MoreAttrs {
                 item_span,
                 attr_spans,
             } => {
@@ -45,23 +60,15 @@ impl From<AttrError> for syn::Error {
 
                 attr_spans
                     .into_iter()
-                    .map(|span| Self::new(span, "'oxymp' attribute used here"))
+                    .map(|span| Self::new(span, "attribute used here"))
                     .for_each(|attr_err| error.combine(attr_err));
 
                 error
             }
 
-            AttrError::Not2Segments(span) => {
-                let msg = "Attribute containing 'oxymp' must have exactly two path segments. Make sure it is in the form of #[oxymp::feature].";
-                Self::new(span, msg)
-            }
+            MarkerAttrError::AttrSyntax(e) => e.into(),
 
-            AttrError::PathArg(span) => {
-                let msg = "Generics in path arguments are not allowed. Please remove them.";
-                Self::new(span, msg)
-            }
-
-            AttrError::Multi(errs) => {
+            MarkerAttrError::Multi(errs) => {
                 let mut iter = errs.into_iter().map(|err| err.into());
                 let first = iter.next().expect("must have at least one error");
 
@@ -85,25 +92,39 @@ pub enum OxyMPAttr {
     LRParser,
 }
 
+const ATTR_SEGMENT_ERR: &str = "Attribute containing 'oxymp' must have exactly two path segments. Make sure it is in the form of #[oxymp::feature].";
+
 impl OxyMPAttr {
-    fn from_attr(attr: syn::Attribute) -> Result<(OxyMPAttr, Span), AttrError> {
+    fn from_attr(attr: syn::Attribute) -> Result<(OxyMPAttr, Span), MarkerAttrError> {
         let segments: Vec<_> = attr.path().segments.iter().collect();
-        let attr_span = attr.span();
+        let span = attr.span();
 
         let mut errors = Vec::new();
 
+        assert!(
+            segments
+                .first()
+                .map(|segment| segment.ident.to_string())
+                .unwrap_or_default()
+                == "oxymp",
+            "The first segment of the attribute must be 'oxymp'"
+        );
+
         if segments.len() != 2 {
-            errors.push(AttrError::Not2Segments(attr_span));
+            errors.push(AttrError::SegmentError {
+                span,
+                msg: ATTR_SEGMENT_ERR,
+            });
         }
 
         for segment in &segments {
-            if !matches!(segment.arguments, syn::PathArguments::None) {
+            if segment.arguments != syn::PathArguments::None {
                 errors.push(AttrError::PathArg(segment.span()));
             }
         }
 
         if !errors.is_empty() {
-            return Err(AttrError::Multi(errors));
+            return Err(errors.into());
         }
 
         let feature = segments[1].ident.to_string();
@@ -119,17 +140,17 @@ impl OxyMPAttr {
             #[cfg(feature = "lr")]
             "LRParser" => Self::LRParser,
 
-            _ => return Err(AttrError::UnknowAttr(segments[1].span())),
+            _ => return Err(MarkerAttrError::UnknowAttr(segments[1].span())),
         };
 
-        Ok((oxymp_attr, attr_span))
+        Ok((oxymp_attr, attr.span()))
     }
 }
 
 // credit to polkadot-sdk
 pub fn remove_first_oxymp_attr(
     item: &mut syn::Item,
-) -> Result<Option<(OxyMPAttr, Span)>, AttrError> {
+) -> Result<Option<(OxyMPAttr, Span)>, MarkerAttrError> {
     let Some(attrs) = get_item_attrs(item) else {
         return Ok(None);
     };
@@ -188,5 +209,45 @@ pub fn get_ident_span(item: &syn::Item) -> Span {
         syn::Item::Type(item) => item.ident.span(),
         syn::Item::Union(item) => item.ident.span(),
         _ => item.span(),
+    }
+}
+
+pub fn get_item_variant(item: &syn::Item) -> &'static str {
+    match item {
+        syn::Item::Enum(_) => "an enum",
+        syn::Item::ExternCrate(_) => "an extern crate",
+        syn::Item::Fn(_) => "a function",
+        syn::Item::ForeignMod(_) => "a foreign module",
+        syn::Item::Impl(_) => "an impl block",
+        syn::Item::Macro(_) => "a macro",
+        syn::Item::Mod(_) => "a module",
+        syn::Item::Static(_) => "a static variable",
+        syn::Item::Struct(_) => "a struct",
+        syn::Item::Trait(_) => "a trait",
+        syn::Item::TraitAlias(_) => "a trait alias",
+        syn::Item::Type(_) => "a type",
+        syn::Item::Union(_) => "a union",
+        syn::Item::Use(_) => "an import",
+        _ => "an unknown item",
+    }
+}
+
+pub fn get_item_ds_span(item: &syn::Item) -> proc_macro2::Span {
+    match item {
+        syn::Item::Enum(item) => item.enum_token.span,
+        syn::Item::ExternCrate(item) => item.extern_token.span,
+        syn::Item::Fn(item) => item.sig.fn_token.span,
+        syn::Item::ForeignMod(item) => item.abi.extern_token.span,
+        syn::Item::Impl(item) => item.impl_token.span,
+        syn::Item::Macro(item) => item.mac.path.span(),
+        syn::Item::Mod(item) => item.mod_token.span,
+        syn::Item::Static(item) => item.static_token.span,
+        syn::Item::Struct(item) => item.struct_token.span,
+        syn::Item::Trait(item) => item.trait_token.span,
+        syn::Item::TraitAlias(item) => item.trait_token.span,
+        syn::Item::Type(item) => item.type_token.span,
+        syn::Item::Union(item) => item.union_token.span,
+        syn::Item::Use(item) => item.use_token.span,
+        item => item.span(),
     }
 }
