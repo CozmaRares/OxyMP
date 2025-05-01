@@ -51,26 +51,22 @@ mod language {
     }
 
     #[oxymp::Lexer]
-    // #[skip(r"[ \t]+")]
-    mod lexer {}
-
-    #[oxymp::Lexer]
-    // #[skip(r"[ \t]+")]
-    mod lexer2 {
-        type SomeType = ();
-    }
+    #[skip(r"[ \t]+")]
+    pub mod lexer {}
 
     #[oxymp::RDParser]
     // #[grammar(E = T T1?)]
     // #[grammar(T1 = (r"\+" | "-") E)]
     // #[grammar(T = Number | r"\(" E r"\)")]
-    pub struct RDParser;
+    mod rd_parser {}
 }
 use language::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let input = "0 1    +2 if ia ifff";
-    // let r = Lexer::tokenize(input);
+    let input = "1 1    +2 if ia ifff";
+    let r = lexer::tokenize(input);
+    println!("{:#?}", input);
+    println!("{:#?}", r);
     //
     // match r {
     //     Err(e) => eprintln!("{e}"),

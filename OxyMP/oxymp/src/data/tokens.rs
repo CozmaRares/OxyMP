@@ -19,7 +19,6 @@ enum TokenError {
     Regex(syn::Error),
 
     ExactData(Span),
-    RegexNoData(Span),
     RegexUnnamedNot1(Span),
 
     AttrSyntax(AttrError),
@@ -92,10 +91,6 @@ impl From<TokenError> for syn::Error {
                 let msg = "Exact tokens can't contain any data. Remove any associated data for this token variant.";
                 syn::Error::new(span, msg)
             }
-            TokenError::RegexNoData(span) => {
-                let msg = "Regex tokens must contain some data. Make sure that the variant contains some data.";
-                syn::Error::new(span, msg)
-            }
             TokenError::RegexUnnamedNot1(span) => {
                 let msg = "Regex tokens must only contain one unnamed field.";
                 syn::Error::new(span, msg)
@@ -115,11 +110,6 @@ impl From<TokenError> for syn::Error {
     }
 }
 
-// "The enum has no variants defined. Define at least one variant.",
-//
-// "Exact tokens can't contain any data. Consider removing any associated data for this token variant.",
-// "Regex tokens must contain some data. Make sure that the variant definition includes encapsulated data."
-
 #[derive(Debug)]
 pub enum TokenPattern {
     Exact {
@@ -132,7 +122,7 @@ pub enum TokenPattern {
 }
 
 impl TokenPattern {
-    fn span(&self) -> Span {
+    pub fn span(&self) -> Span {
         match self {
             TokenPattern::Exact { pattern } => pattern.span(),
             TokenPattern::Regex { pattern, .. } => pattern.span(),
@@ -309,21 +299,13 @@ fn ensure_correct_fields(
 ) -> Option<TokenError> {
     match (&pattern, &fields) {
         (TokenPattern::Exact { .. }, syn::Fields::Unit) => None,
+        (TokenPattern::Regex { .. }, syn::Fields::Unnamed(fields_unnamed))
+            if fields_unnamed.unnamed.len() == 1 =>
+        {
+            None
+        }
 
         (TokenPattern::Exact { .. }, _) => Some(TokenError::ExactData(fields.span())),
-
-        (TokenPattern::Regex { .. }, syn::Fields::Unit) => {
-            Some(TokenError::RegexNoData(ident.span()))
-        }
-
-        (TokenPattern::Regex { .. }, syn::Fields::Named(_)) => {
-            Some(TokenError::RegexUnnamedNot1(ident.span()))
-        }
-        (TokenPattern::Regex { .. }, syn::Fields::Unnamed(fields_unnamed)) => {
-            match fields_unnamed.unnamed.len() != 1 {
-                false => None,
-                true => Some(TokenError::RegexUnnamedNot1(ident.span())),
-            }
-        }
+        (TokenPattern::Regex { .. }, _) => Some(TokenError::RegexUnnamedNot1(ident.span())),
     }
 }

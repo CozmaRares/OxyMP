@@ -155,7 +155,7 @@ pub enum Transition {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StateTag {
-    Skip { lexer: String, pattern: String },
+    Skip { pattern: String },
     Token { variant: String, priority: usize },
 }
 
@@ -166,7 +166,7 @@ impl TryFrom<nfa::StateTag> for StateTag {
         match value {
             nfa::StateTag::None => Err(()),
             nfa::StateTag::Token { variant, priority } => Ok(StateTag::Token { variant, priority }),
-            nfa::StateTag::Skip { lexer, pattern } => Ok(StateTag::Skip { lexer, pattern }),
+            nfa::StateTag::Skip { pattern } => Ok(StateTag::Skip { pattern }),
         }
     }
 }

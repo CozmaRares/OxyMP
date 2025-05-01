@@ -94,7 +94,7 @@ pub enum StateKind {
 
 #[derive(Debug, Clone)]
 pub enum StateTag {
-    Skip { lexer: String, pattern: String },
+    Skip { pattern: String },
     Token { variant: String, priority: usize },
     None,
 }

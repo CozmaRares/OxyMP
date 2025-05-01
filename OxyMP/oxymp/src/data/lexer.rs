@@ -1,11 +1,11 @@
 use quote::ToTokens;
+use syn::spanned::Spanned;
 
 use super::helpers::{get_item_ds_span, TRAILING_TOKENS_ERR};
 
 #[derive(Debug)]
 pub struct LexerData {
     pub visibility: proc_macro2::TokenStream,
-    pub ident: syn::Ident,
     pub skip_patterns: Vec<syn::LitStr>,
 }
 
@@ -17,8 +17,20 @@ pub(super) fn process_lexer(item: syn::Item) -> syn::Result<(syn::ItemMod, Lexer
         ));
     };
 
+    match &item.content {
+        Some((_, items)) if items.is_empty() => Ok(()),
+        Some((_, items)) => {
+            let span = items.first().expect("has 1 item").span();
+            Err((span, "No items allowed in lexer module."))
+        }
+        None => Err((item.ident.span(), "Missing `{}`.")),
+    }
+    .map_err(|(span, msg)| {
+        let msg = format!("Lexer module must have an empty content block. {}", msg);
+        syn::Error::new(span, msg)
+    })?;
+
     let visibility = item.vis.to_token_stream();
-    let ident = item.ident.clone();
 
     let mut skip_patterns = Vec::new();
     let mut attributes = Vec::new();
@@ -39,7 +51,6 @@ pub(super) fn process_lexer(item: syn::Item) -> syn::Result<(syn::ItemMod, Lexer
     Ok((
         item,
         LexerData {
-            ident,
             visibility,
             skip_patterns,
         },

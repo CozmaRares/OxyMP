@@ -13,6 +13,7 @@ mod data;
 mod generate;
 mod utils;
 mod idents;
+mod automata;
 
 use data::process_module;
 use generate::generate;

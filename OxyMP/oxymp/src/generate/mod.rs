@@ -1,4 +1,7 @@
+mod lexer;
 mod tokens;
+
+use lexer::LexerCache;
 
 use crate::data::Data;
 
@@ -9,6 +12,17 @@ pub fn generate(data: Data) -> syn::Result<proc_macro2::TokenStream> {
     };
 
     items.extend(tokens::generate_structs(&data.tokens));
+
+    let mut lexer_cache = LexerCache::new();
+
+    for (item_mod, lexer_data) in data.lexers.into_iter() {
+        items.extend(lexer::generate(
+            &data.tokens,
+            lexer_data,
+            item_mod,
+            &mut lexer_cache,
+        )?);
+    }
 
     module.content = Some((brace, items));
     Ok(q! { #module })
@@ -47,37 +61,6 @@ pub fn generate(data: Data) -> syn::Result<proc_macro2::TokenStream> {
 //     token_nfas.push(nfa);
 // }
 //
-// for lexer_data in data.lexers {
-//     let mut skip_nfas = Vec::new();
-//
-//     for pattern_lit in &lexer_data.skip_patterns {
-//         let pattern = pattern_lit.value();
-//         let nfa = nfa::compile(
-//             &pattern,
-//             nfa::StateTag::Skip {
-//                 lexer: lexer_data.ident.to_string(),
-//                 pattern: pattern.clone(),
-//             },
-//         )
-//         .map_err(|e| {
-//             syn::Error::new(
-//                 pattern_lit.span(),
-//                 format!(
-//                     "Error while compiling regex pattern for skip pattern '{}'\n{}",
-//                     pattern, e
-//                 ),
-//             )
-//         })?;
-//
-//         skip_nfas.push(nfa);
-//     }
-//
-//     let nfas = [skip_nfas, token_nfas.clone()].concat();
-//     let nfa = nfa::combine(nfas);
-//     let dfa = dfa::compile(nfa);
-//
-//     let generated_items = generate::lexer::generate(&data.tokens, lexer_data, dfa)?;
-//     items.extend(generated_items);
 // }
 //
 // #[cfg(feature = "rd")]
