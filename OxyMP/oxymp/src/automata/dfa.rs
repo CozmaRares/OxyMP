@@ -114,7 +114,7 @@ fn compress_char_classes(mut dfa: DFA) -> DFA {
                 .flat_map(|(target, transitions)| {
                     transitions
                         .into_iter()
-                        .map(move |transition| (transition, target.clone()))
+                        .map(move |transition| (transition, target))
                 })
                 .collect();
 
@@ -221,6 +221,7 @@ impl State {
 }
 
 #[derive(Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct DFA {
     states: HashMap<usize, State>,
 }
@@ -291,18 +292,12 @@ struct DFABuilder<'a> {
 
 impl<'a> DFABuilder<'a> {
     fn new(nfa: &'a nfa::NFA) -> Self {
-        let mut builder = DFABuilder {
+        DFABuilder {
             nfa,
             state_id_counter: 0,
             states: HashMap::new(),
             unmarked_states: HashSet::new(),
-        };
-
-        builder
-    }
-
-    fn start_state(&self) -> usize {
-        0
+        }
     }
 
     fn create_state(&mut self, nfa_equivalent_states: HashSet<usize>) -> usize {
@@ -315,7 +310,7 @@ impl<'a> DFABuilder<'a> {
 
         let mut kind = StateKind::NotAccepting;
 
-        for (state_id, state) in &nfa_states {
+        for (_, state) in &nfa_states {
             if matches!(state.kind, nfa::StateKind::Accepting) {
                 let tag = state
                     .tag

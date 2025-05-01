@@ -5,7 +5,7 @@ use quote::format_ident;
 use crate::{
     automata::{
         dfa::{
-            self, State as DFAState, StateKind as DFAStateKind, StateTag as DFAStateTag,
+            self, StateKind as DFAStateKind, StateTag as DFAStateTag,
             Transition as DFATransition, DFA,
         },
         nfa::{self, NFA},

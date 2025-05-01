@@ -1,13 +1,7 @@
 use std::any::Any;
 
 pub fn extract_panic_message(e: &Box<dyn Any + Send + 'static>) -> Option<String> {
-    if let Some(s) = e.downcast_ref::<String>() {
-        Some(s.clone())
-    } else if let Some(s) = e.downcast_ref::<&str>() {
-        Some(s.to_string())
-    } else {
-        None
-    }
+    e.downcast_ref::<String>().map(|s| s.to_string())
 }
 
 macro_rules! pq {

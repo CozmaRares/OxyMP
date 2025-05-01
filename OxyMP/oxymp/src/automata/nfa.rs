@@ -7,13 +7,7 @@ use regex_syntax::{
     parse,
 };
 
-use crate::{
-    data::{
-        lexer::LexerData,
-        tokens::{TokenPattern, TokensData},
-    },
-    utils::capitalize,
-};
+use crate::utils::capitalize;
 
 // TODO: report common regexes that are not supported
 #[derive(Debug, thiserror::Error)]
@@ -31,7 +25,7 @@ pub enum UnsupportedFeature {
 #[derive(Debug, thiserror::Error)]
 pub enum NFACompileError {
     #[error("{}", capitalize(format!("{}", .0)))]
-    Message(#[from] regex_syntax::Error),
+    Message(#[from] Box<regex_syntax::Error>),
     #[error("NFA compilation encountered an unsupported regex feature: {0}")]
     Unsupported(#[from] UnsupportedFeature),
     #[error("NFA compiled from '{0}' allows matching an empty string. Token variants must match at least one character.")]
@@ -40,8 +34,8 @@ pub enum NFACompileError {
 
 type NFACompileResult = Result<NFA, NFACompileError>;
 
-pub fn compile<'a>(regex: &str, tag: StateTag) -> NFACompileResult {
-    let hir = parse(regex)?;
+pub fn compile(regex: &str, tag: StateTag) -> NFACompileResult {
+    let hir = parse(regex).map_err(Box::new)?;
     let mut nfa = visit_hir(&hir)?;
 
     if nfa
@@ -70,9 +64,9 @@ pub fn combine(nfas: Vec<NFA>) -> NFA {
         .collect();
 
     // reconnect dangling ending states of inner NFAs
-    let mut end_state = builder.create_state(StateKind::Inherit);
-    for end_state_ in end_states {
-        builder.add_transition(end_state_, end_state, Transition::Epsilon);
+    let end_state = builder.create_state(StateKind::Inherit);
+    for inner_end_state in end_states {
+        builder.add_transition(inner_end_state, end_state, Transition::Epsilon);
     }
 
     builder.build()
@@ -121,6 +115,7 @@ impl State {
 }
 
 #[derive(Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct NFA {
     states: HashMap<usize, State>,
     end_state: usize,
@@ -128,7 +123,7 @@ pub struct NFA {
 
 impl NFA {
     fn set_states_tag(&mut self, tag: StateTag) {
-        self.states.iter_mut().for_each(|(id, state)| {
+        self.states.iter_mut().for_each(|(_, state)| {
             if matches!(state.kind, StateKind::Accepting) {
                 state.tag = tag.clone();
             }
@@ -176,11 +171,10 @@ impl NFA {
         self
     }
 
-    fn to_not_accepting(mut self) -> Self {
+    fn remove_accepting_states(&mut self) {
         self.states
             .iter_mut()
             .for_each(|(_, state)| state.kind = StateKind::NotAccepting);
-        self
     }
 
     // THESE ERRORS SHOULD HAPPEN ONLY WHEN THE CODE IS INCORRECT
@@ -198,21 +192,19 @@ impl NFA {
         );
 
         assert!(
-            self.states
+            !self
+                .states
                 .get(&self.start_state())
                 .unwrap()
                 .transitions
-                .len()
-                != 0,
+                .is_empty(),
             "NFA start state must have at least one transition"
         );
         assert!(
             self.states
                 .get(&self.end_state())
                 .unwrap()
-                .transitions
-                .len()
-                == 0,
+                .transitions.is_empty(),
             "NFA end state can't have any transitions"
         );
 
@@ -247,7 +239,7 @@ impl NFA {
             let state = self.states.get(&state_id).expect("state not found");
 
             for (transition, next_state_id) in &state.transitions {
-                if !matches!(transition, Transition::Epsilon) || state_ids.contains(&*next_state_id)
+                if !matches!(transition, Transition::Epsilon) || state_ids.contains(next_state_id)
                 {
                     continue;
                 }
@@ -267,7 +259,7 @@ impl NFA {
         let mut state_ids = HashSet::new();
 
         for state_id in starting_state_ids {
-            let state = self.states.get(&state_id).expect("state not found");
+            let state = self.states.get(state_id).expect("state not found");
 
             for (transition, next_state_id) in &state.transitions {
                 match transition {
@@ -358,7 +350,7 @@ impl NFABuilder {
         }
     }
 
-    fn append_nfa(&mut self, state_id: usize, mut nfa: NFA) {
+    fn append_nfa(&mut self, state_id: usize, nfa: NFA) {
         let offset = self.end_state();
         let mut reindexed_nfa = nfa.reindex_states(offset);
         let nfa_start = reindexed_nfa
@@ -387,11 +379,11 @@ impl NFABuilder {
 fn visit_hir(hir: &Hir) -> Result<NFA, UnsupportedFeature> {
     match hir.kind() {
         HirKind::Empty => Err(UnsupportedFeature::EmptyPattern),
-        HirKind::Look(look) => Err(UnsupportedFeature::LookaheadPattern),
+        HirKind::Look(_) => Err(UnsupportedFeature::LookaheadPattern),
         HirKind::Literal(literal) => Ok(visit_literal(literal)),
         HirKind::Class(class) => match class {
             Class::Unicode(class) => Ok(visit_class(class)),
-            Class::Bytes(class) => Err(UnsupportedFeature::ByteCharClass),
+            Class::Bytes(_) => Err(UnsupportedFeature::ByteCharClass),
         },
         HirKind::Repetition(repetition) => visit_repetition(repetition),
         HirKind::Capture(capture) => visit_hir(&capture.sub),
@@ -453,7 +445,8 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
     let nfa = visit_hir(&repetition.sub)?;
 
     if repetition.min > 0 {
-        let nfa_not_accepting = nfa.clone().to_not_accepting();
+        let mut nfa_not_accepting = nfa.clone();
+        nfa_not_accepting.remove_accepting_states();
 
         // first min-1 NFAs must not accept transformations
         for _ in 1..repetition.min {
@@ -515,7 +508,7 @@ fn visit_concat(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
         let mut nfa = visit_hir(hir)?;
 
         if idx != hirs.len() - 1 {
-            nfa = nfa.to_not_accepting();
+            nfa.remove_accepting_states();
         }
 
         builder.append_nfa(builder.end_state(), nfa);
@@ -537,9 +530,9 @@ fn visit_alternation(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
         .collect::<Result<Vec<_>, _>>()?;
 
     // reconnect dangling ending states of inner NFAs
-    let mut end_state = builder.create_state(StateKind::Inherit);
-    for end_state_ in end_states {
-        builder.add_transition(end_state_, end_state, Transition::Epsilon);
+    let end_state = builder.create_state(StateKind::Inherit);
+    for inner_end_state in end_states {
+        builder.add_transition(inner_end_state, end_state, Transition::Epsilon);
     }
 
     Ok(builder.build())

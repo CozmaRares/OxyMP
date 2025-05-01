@@ -103,7 +103,7 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
                 }
 
                 let err = MarkerAttrError::MoreAttrs {
-                    item_span: helpers::get_ident_span(&mut item),
+                    item_span: helpers::get_ident_span(&item),
                     attr_spans,
                 };
 
@@ -113,7 +113,7 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
             match oxymp_attr {
                 OxyMPAttr::Tokens => {
                     let data = tokens::process_tokens(&mut item)?;
-                    builder.add_tokens(helpers::get_item_ds_span(&mut item), data);
+                    builder.add_tokens(helpers::get_item_ds_span(&item), data);
                     Ok(Some(item))
                 }
                 OxyMPAttr::Lexer => {
@@ -144,7 +144,7 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
         return builder.build(module);
     }
 
-    let mut iter = errors.into_iter().map(|err| err.into());
+    let mut iter = errors.into_iter();
     let first = iter.next().expect("must have at least one error");
 
     Err(iter.fold(first, |mut acc, err| {

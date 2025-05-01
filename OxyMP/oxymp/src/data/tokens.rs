@@ -281,7 +281,7 @@ fn remove_first_pattern_attr(
     attrs: &mut Vec<syn::Attribute>,
 ) -> Result<Option<TokenPattern>, TokenError> {
     for (idx, attr) in attrs.iter().enumerate() {
-        let result = TokenPattern::from_attr(&attr)?;
+        let result = TokenPattern::from_attr(attr)?;
 
         if let Some(pattern) = result {
             attrs.remove(idx);

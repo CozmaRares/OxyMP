@@ -212,26 +212,6 @@ pub fn get_ident_span(item: &syn::Item) -> Span {
     }
 }
 
-pub fn get_item_variant(item: &syn::Item) -> &'static str {
-    match item {
-        syn::Item::Enum(_) => "an enum",
-        syn::Item::ExternCrate(_) => "an extern crate",
-        syn::Item::Fn(_) => "a function",
-        syn::Item::ForeignMod(_) => "a foreign module",
-        syn::Item::Impl(_) => "an impl block",
-        syn::Item::Macro(_) => "a macro",
-        syn::Item::Mod(_) => "a module",
-        syn::Item::Static(_) => "a static variable",
-        syn::Item::Struct(_) => "a struct",
-        syn::Item::Trait(_) => "a trait",
-        syn::Item::TraitAlias(_) => "a trait alias",
-        syn::Item::Type(_) => "a type",
-        syn::Item::Union(_) => "a union",
-        syn::Item::Use(_) => "an import",
-        _ => "an unknown item",
-    }
-}
-
 pub fn get_item_ds_span(item: &syn::Item) -> proc_macro2::Span {
     match item {
         syn::Item::Enum(item) => item.enum_token.span,
