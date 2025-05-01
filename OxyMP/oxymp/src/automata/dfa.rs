@@ -231,6 +231,47 @@ impl DFA {
     pub fn states(&self) -> &HashMap<usize, State> {
         &self.states
     }
+
+    fn assert_valid(&self) {
+        let start_state = 1;
+
+        assert!(
+            self.states.contains_key(&start_state),
+            "DFA start state not found"
+        );
+
+        assert!(
+            !self
+                .states
+                .get(&start_state)
+                .unwrap()
+                .transitions
+                .is_empty(),
+            "DFA start state must have at least one transition"
+        );
+
+        for (state_id, state) in &self.states {
+            assert!(
+                state_id >= &start_state,
+                "State {} must have a higher id than the start state",
+                state_id
+            );
+
+            for (_, next_state) in &state.transitions {
+                assert!(
+                    self.states.contains_key(next_state),
+                    "Transition target state {} not found",
+                    next_state
+                );
+
+                assert!(
+                    *next_state != start_state,
+                    "State {} can't have a transition to the start state",
+                    state_id
+                );
+            }
+        }
+    }
 }
 
 impl std::fmt::Debug for DFA {
@@ -355,7 +396,7 @@ impl<'a> DFABuilder<'a> {
                 .map(|(id, state)| (id, state.state))
                 .collect(),
         };
-        // dfa.assert_valid();
+        dfa.assert_valid();
         dfa
     }
 }

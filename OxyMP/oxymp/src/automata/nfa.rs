@@ -177,10 +177,6 @@ impl NFA {
             .for_each(|(_, state)| state.kind = StateKind::NotAccepting);
     }
 
-    // THESE ERRORS SHOULD HAPPEN ONLY WHEN THE CODE IS INCORRECT
-    // TODO: create more of these assertions in the codebase
-    // TODO: not accepting states must not have a tag
-    // TODO: no epsilon self-loops
     fn assert_valid(&self) {
         assert!(
             self.states.contains_key(&self.start_state()),
@@ -209,7 +205,18 @@ impl NFA {
         );
 
         for (state_id, state) in &self.states {
-            for (_, next_state) in &state.transitions {
+            match state.kind {
+                StateKind::Accepting => {}
+                _ => {
+                    assert!(
+                        matches!(state.tag, StateTag::None),
+                        "NFA state {} is not accepting but has a tag",
+                        state_id
+                    );
+                }
+            }
+
+            for (transition, next_state) in &state.transitions {
                 assert!(
                     self.states.contains_key(next_state),
                     "Transition target state {} not found",
@@ -221,6 +228,15 @@ impl NFA {
                     "State {} can't have a transition to the start state",
                     state_id
                 );
+
+                match transition {
+                    Transition::Epsilon => assert!(
+                        next_state != state_id,
+                        "State {} has an epsilon transition to itself",
+                        state_id
+                    ),
+                    _ => {}
+                }
             }
         }
     }

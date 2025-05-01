@@ -5,6 +5,7 @@
 // TODO: change all unwraps to expect where no explanation is needed
 // TODO: create a 'symbols' module with all the symbols used for the std lib
 // TODO: reorganize the order of functions and data structures in all the modules
+// TODO: use assert! more often
 
 #[macro_use]
 mod macros;
