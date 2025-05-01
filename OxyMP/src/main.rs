@@ -16,22 +16,19 @@ mod language {
         }
     }
 
-    fn match_number(input: &str) -> Result<Tok, TokenizeError> {
-        input
-            .parse()
-            .map(|t| Tok::Number { value: t })
-            .map_err(TokenizeError::NumberParseError)
+    fn match_number(input: &str) -> Result<f64, TokenizeError> {
+        input.parse().map_err(TokenizeError::NumberParseError)
     }
 
-    fn match_ident(input: &str) -> Result<Tok, TokenizeError> {
-        Ok(Tok::Ident(input.to_string()))
+    fn match_ident(input: &str) -> Result<String, TokenizeError> {
+        Ok(input.to_string())
     }
 
     #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
         #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
-        Number { value: f64 },
+        Number(f64),
         #[exact(r"\(")]
         ParenLeft,
 
@@ -55,7 +52,13 @@ mod language {
 
     #[oxymp::Lexer]
     // #[skip(r"[ \t]+")]
-    pub struct Lexer;
+    mod lexer {}
+
+    #[oxymp::Lexer]
+    // #[skip(r"[ \t]+")]
+    mod lexer2 {
+        type SomeType = ();
+    }
 
     #[oxymp::RDParser]
     // #[grammar(E = T T1?)]

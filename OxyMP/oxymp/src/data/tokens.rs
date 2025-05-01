@@ -4,7 +4,7 @@ use syn::spanned::Spanned;
 
 use crate::utils::capitalize;
 
-use super::helpers::{get_item_ds_span, AttrError};
+use super::helpers::{get_item_ds_span, AttrError, TRAILING_TOKENS_ERR};
 
 enum TokenError {
     NotEnum(Span),
@@ -20,6 +20,7 @@ enum TokenError {
 
     ExactData(Span),
     RegexNoData(Span),
+    RegexUnnamedNot1(Span),
 
     AttrSyntax(AttrError),
     Multi(Vec<TokenError>),
@@ -62,9 +63,9 @@ impl From<TokenError> for syn::Error {
             }
             TokenError::NoPattern(span) => {
                 let msg = format!(
-                    "The variant has no pattern defined. Define on of the following attributes:\n\n{}\nor\n\n{}",
-                    EXACT_ATTR_FORMAT, REGEX_ATTR_FORMAT
-                );
+                            "The variant has no pattern defined. Define on of the following attributes:\n\n{}\nor\n\n{}",
+                            EXACT_ATTR_FORMAT, REGEX_ATTR_FORMAT
+                        );
                 syn::Error::new(span, msg)
             }
 
@@ -84,7 +85,6 @@ impl From<TokenError> for syn::Error {
 
                 error
             }
-
             TokenError::Exact(err) => generate_err(err, EXACT_ATTR_FORMAT),
             TokenError::Regex(err) => generate_err(err, REGEX_ATTR_FORMAT),
 
@@ -96,9 +96,12 @@ impl From<TokenError> for syn::Error {
                 let msg = "Regex tokens must contain some data. Make sure that the variant contains some data.";
                 syn::Error::new(span, msg)
             }
+            TokenError::RegexUnnamedNot1(span) => {
+                let msg = "Regex tokens must only contain one unnamed field.";
+                syn::Error::new(span, msg)
+            }
 
             TokenError::AttrSyntax(e) => e.into(),
-
             TokenError::Multi(errs) => {
                 let mut iter = errs.into_iter().map(|err| err.into());
                 let first = iter.next().expect("must have at least one error");
@@ -136,9 +139,6 @@ impl TokenPattern {
         }
     }
 }
-
-const TRAILING_TOKENS_ERR: &str =
-    "Unexpected remaining tokens after parsing the attribute. Remove the trailing tokens";
 
 impl TokenPattern {
     fn parse_exact(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
@@ -316,18 +316,13 @@ fn ensure_correct_fields(
             Some(TokenError::RegexNoData(ident.span()))
         }
 
-        (TokenPattern::Regex { .. }, syn::Fields::Named(fields_named)) => {
-            if fields_named.named.is_empty() {
-                Some(TokenError::RegexNoData(ident.span()))
-            } else {
-                None
-            }
+        (TokenPattern::Regex { .. }, syn::Fields::Named(_)) => {
+            Some(TokenError::RegexUnnamedNot1(ident.span()))
         }
         (TokenPattern::Regex { .. }, syn::Fields::Unnamed(fields_unnamed)) => {
-            if fields_unnamed.unnamed.is_empty() {
-                Some(TokenError::RegexNoData(ident.span()))
-            } else {
-                None
+            match fields_unnamed.unnamed.len() != 1 {
+                false => None,
+                true => Some(TokenError::RegexUnnamedNot1(ident.span())),
             }
         }
     }

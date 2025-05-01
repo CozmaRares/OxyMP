@@ -251,3 +251,6 @@ pub fn get_item_ds_span(item: &syn::Item) -> proc_macro2::Span {
         item => item.span(),
     }
 }
+
+pub const TRAILING_TOKENS_ERR: &str =
+    "Unexpected remaining tokens after parsing the attribute. Remove the trailing tokens";
