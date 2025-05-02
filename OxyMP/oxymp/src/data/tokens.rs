@@ -38,7 +38,7 @@ impl From<Vec<TokenError>> for TokenError {
 }
 
 const EXACT_ATTR_FORMAT: &str = r#"#[exact("your exact string")]"#;
-const REGEX_ATTR_FORMAT: &str = r#"#[regex("your regex", ::path::to::function)]"#;
+const REGEX_ATTR_FORMAT: &str = r#"#[regex("your regex", function_identifier)]"#;
 
 #[inline]
 fn generate_err(err: syn::Error, correct_format: &str) -> syn::Error {
@@ -117,7 +117,7 @@ pub enum TokenPattern {
     },
     Regex {
         pattern: syn::LitStr,
-        transform: syn::Path,
+        transform: syn::Ident,
     },
 }
 
@@ -149,6 +149,13 @@ impl TokenPattern {
         if !input.is_empty() {
             return Err(syn::Error::new(input.span(), TRAILING_TOKENS_ERR));
         }
+
+        if transform.segments.len() != 1 {
+            let msg = "Transform function must be a single identifier. Make sure the function is accessible in the module's scope";
+            return Err(syn::Error::new(transform.span(), msg));
+        }
+
+        let transform = transform.segments.first().unwrap().ident.clone();
 
         Ok(TokenPattern::Regex {
             pattern: regex,

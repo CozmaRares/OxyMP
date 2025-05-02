@@ -64,7 +64,8 @@ impl syn::parse::Parse for SkipAttr {
         let pattern: syn::LitStr = input.parse()?;
 
         if !input.is_empty() {
-            return Err(syn::Error::new(input.span(), TRAILING_TOKENS_ERR));
+            let msg = format!("{}.", TRAILING_TOKENS_ERR);
+            return Err(syn::Error::new(input.span(), msg));
         }
 
         Ok(SkipAttr(pattern))

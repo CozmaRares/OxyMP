@@ -200,7 +200,8 @@ impl NFA {
             self.states
                 .get(&self.end_state())
                 .unwrap()
-                .transitions.is_empty(),
+                .transitions
+                .is_empty(),
             "NFA end state can't have any transitions"
         );
 
@@ -255,8 +256,7 @@ impl NFA {
             let state = self.states.get(&state_id).expect("state not found");
 
             for (transition, next_state_id) in &state.transitions {
-                if !matches!(transition, Transition::Epsilon) || state_ids.contains(next_state_id)
-                {
+                if !matches!(transition, Transition::Epsilon) || state_ids.contains(next_state_id) {
                     continue;
                 }
 

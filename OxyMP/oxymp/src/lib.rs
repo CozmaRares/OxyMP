@@ -10,11 +10,11 @@
 #[macro_use]
 mod macros;
 
+mod automata;
 mod data;
 mod generate;
-mod utils;
 mod idents;
-mod automata;
+mod utils;
 
 use data::process_module;
 use generate::generate;

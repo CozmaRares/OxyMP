@@ -75,7 +75,6 @@ fn generate_try_from(tokens_ident: &syn::Ident, variant: &TokenVariant) -> syn::
 
     let struct_ident = idents::token_struct(tokens_ident, variant_ident);
 
-
     let (fields_stream, fields_cloned) = match fields {
         syn::Fields::Named(fields_named) => {
             let iter = fields_named.named.iter().map(|field| match &field.ident {

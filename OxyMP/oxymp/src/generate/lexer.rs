@@ -5,8 +5,8 @@ use quote::format_ident;
 use crate::{
     automata::{
         dfa::{
-            self, StateKind as DFAStateKind, StateTag as DFAStateTag,
-            Transition as DFATransition, DFA,
+            self, StateKind as DFAStateKind, StateTag as DFAStateTag, Transition as DFATransition,
+            DFA,
         },
         nfa::{self, NFA},
     },
@@ -24,11 +24,7 @@ pub fn generate(
 ) -> syn::Result<Vec<syn::Item>> {
     let mut items = Vec::new();
 
-    let dfa = generate_lexer_dfa(
-        tokens_data,
-        &lexer_data.skip_patterns,
-        cache,
-    )?;
+    let dfa = generate_lexer_dfa(tokens_data, &lexer_data.skip_patterns, cache)?;
 
     let (error_idents, error_items) = cache.get_error_idents();
     items.extend(error_items);
@@ -98,8 +94,8 @@ struct ErrorItem {
 
 #[allow(non_snake_case)]
 fn generate_error_ds() -> ErrorItem {
-    let LexerExpected = format_ident!("__LexerExpected_{}", rand::random::<u64>());
-    let LexerError = format_ident!("__LexerError_{}", rand::random::<u64>());
+    let LexerExpected = format_ident!("__Lexer_Common_Expected_{}", rand::random::<u64>());
+    let LexerError = format_ident!("__Lexer_Common_Error_{}", rand::random::<u64>());
 
     let expected_enum: syn::ItemEnum = pq! {
         #[derive(Debug)]
@@ -265,12 +261,10 @@ fn generate_mod(
     dfa: DFA,
     error_idents: &ErrorIdents,
 ) -> syn::Result<Vec<syn::Item>> {
-    let tokenize_fn =
-        generate_tokenize_fn(&tokens_data.ident, lexer_data.visibility);
+    let tokenize_fn = generate_tokenize_fn(lexer_data.visibility);
 
     let states = generate_states(&dfa);
 
-    let tokens_ident = &tokens_data.ident;
     let token_transforms = tokens_data
         .variants
         .iter()
@@ -279,11 +273,11 @@ fn generate_mod(
             let ident = variant.ident.to_string();
 
             let transform = match &variant.pattern {
-                TokenPattern::Exact { .. } => q! { #tokens_ident::#variant_ident },
+                TokenPattern::Exact { .. } => q! { Token::#variant_ident },
                 TokenPattern::Regex { transform, .. } => q! {
-                    #transform(inp)
-                        .map(#tokens_ident::#variant_ident)
-                        .map_err(|e| _internal_oxymp_LexerError::UserTransform(Box::new(e)))?
+                    super::#transform(inp)
+                        .map(Token::#variant_ident)
+                        .map_err(|e| Error::UserTransform(Box::new(e)))?
                 },
             };
 
@@ -295,15 +289,16 @@ fn generate_mod(
 
     let tokens_ident = &tokens_data.ident;
 
-    let ErrorIdents { expected_ident, error_ident } = error_idents;
+    let ErrorIdents {
+        expected_ident,
+        error_ident,
+    } = error_idents;
 
     let item_mod: syn::ItemMod = pq! {
         mod a {
-            use super::*;
-
-            type _internal_oxymp_Token = #tokens_ident;
-            type _internal_oxymp_LexerError = #error_ident;
-            type _internal_oxymp_LexerExpected = #expected_ident;
+            type Token = super::#tokens_ident;
+            pub type Error = super::#error_ident;
+            pub type LexerExpected = super::#expected_ident;
 
             #states
             #(#methods)*
@@ -324,27 +319,27 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
     let state_structs = idents.iter().map(|ident| q! { struct #ident; });
     let transition_branches = idents
         .iter()
-        .map(|ident| q! { _internal_oxymp_LexerState::#ident => #ident::transition(c), });
+        .map(|ident| q! { State::#ident => #ident::transition(c), });
     let accept_branches = idents
         .iter()
-        .map(|ident| q! { _internal_oxymp_LexerState::#ident => #ident::accept(inp, c), });
+        .map(|ident| q! { State::#ident => #ident::accept(inp, c), });
 
     q! {
         #[derive(Debug)]
-        pub(super) enum _internal_oxymp_LexerState {
+        enum State {
             #(#idents),*
         }
 
         #(#state_structs)*
 
-        impl _internal_oxymp_LexerState {
-            pub(super) fn transition(&self, c: char) -> Option<_internal_oxymp_LexerState> {
+        impl State {
+            fn transition(&self, c: char) -> Option<State> {
                 match self {
                     #(#transition_branches)*
                 }
             }
 
-            pub(super) fn accept(&self, inp: &str, c: char) -> Result<Option<_internal_oxymp_Token>, _internal_oxymp_LexerError> {
+            fn accept(&self, inp: &str, c: char) -> Result<Option<Token>, Error> {
                 match self {
                     #(#accept_branches)*
                 }
@@ -360,7 +355,7 @@ fn generate_state_methods<'a>(
     dfa.states().iter().map(move |(state_id, state)| {
         let transition_branches = state.transitions.iter().map(|(transition, target)| {
             let target = format_ident!("_{}", target);
-            let target = q! { Some(_internal_oxymp_LexerState::#target) };
+            let target = q! { Some(State::#target) };
             match transition {
                 DFATransition::Char(c) => q! { #c => #target, },
                 DFATransition::Chars { start, end } => q! { #start..=#end => #target, },
@@ -374,16 +369,16 @@ fn generate_state_methods<'a>(
                     .iter()
                     .map(|(transition, _)| match transition {
                         DFATransition::Char(c) => q! {
-                            _internal_oxymp_LexerExpected::Char(#c)
+                            LexerExpected::Char(#c)
                         },
                         DFATransition::Chars { start, end } => q! {
-                            _internal_oxymp_LexerExpected::CharRange{ start: #start, end: #end }
+                            LexerExpected::CharRange{ start: #start, end: #end }
                         },
                     });
 
                 q! {
                     Err(
-                        _internal_oxymp_LexerError::Native {
+                        Error::Native {
                             unexpected_char: current_char,
                             expected: vec![ #(#expected),* ]
                         }
@@ -405,14 +400,14 @@ fn generate_state_methods<'a>(
 
         q! {
             impl #ident {
-                fn transition(c: char) -> Option<_internal_oxymp_LexerState> {
+                fn transition(c: char) -> Option<State> {
                     match c {
                         #(#transition_branches)*
                         _ => None,
                     }
                 }
 
-                fn accept(inp: &str, current_char: char) -> Result<Option<_internal_oxymp_Token>, _internal_oxymp_LexerError> {
+                fn accept(inp: &str, current_char: char) -> Result<Option<Token>, Error> {
                     #accept
                 }
             }
@@ -420,14 +415,11 @@ fn generate_state_methods<'a>(
     })
 }
 
-fn generate_tokenize_fn(
-    tokens_ident: &proc_macro2::Ident,
-    vis: proc_macro2::TokenStream,
-) -> syn::ItemFn {
-    pq! {
-        #vis fn tokenize(inp: &str) -> Result<Vec<#tokens_ident>, _internal_oxymp_LexerError> {
+fn generate_tokenize_fn(vis: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    q! {
+        #vis fn tokenize(inp: &str) -> Result<Vec<Token>, Error> {
             let mut toks = Vec::new();
-            let mut state = _internal_oxymp_LexerState::_1;
+            let mut state = State::_1;
             let mut match_start = 0;
             let mut iter = inp.chars().enumerate().peekable();
 
@@ -441,7 +433,7 @@ fn generate_tokenize_fn(
                         if let Some(tok) = state.accept(&inp[match_start..*current_index], *c)? {
                             toks.push(tok)
                         }
-                        state = _internal_oxymp_LexerState::_1;
+                        state = State::_1;
                         match_start = *current_index;
                     }
                 }
