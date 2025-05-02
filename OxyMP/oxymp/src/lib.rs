@@ -13,6 +13,7 @@ mod macros;
 mod automata;
 mod data;
 mod generate;
+mod grammar;
 mod idents;
 mod utils;
 

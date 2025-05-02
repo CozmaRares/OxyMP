@@ -6,8 +6,7 @@ use crate::{
 };
 
 // TODO: consider a cleanup
-
-pub fn generate_structs(data: &TokensData) -> impl Iterator<Item = syn::Item> + '_ {
+pub fn generate(data: &TokensData) -> impl Iterator<Item = syn::Item> + '_ {
     let structs = data
         .variants
         .iter()

@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::utils::capitalize;
+use crate::utils::{capitalize, combine_errors};
 
 use super::helpers::{get_item_ds_span, AttrError, TRAILING_TOKENS_ERR};
 
@@ -97,15 +97,7 @@ impl From<TokenError> for syn::Error {
             }
 
             TokenError::AttrSyntax(e) => e.into(),
-            TokenError::Multi(errs) => {
-                let mut iter = errs.into_iter().map(|err| err.into());
-                let first = iter.next().expect("must have at least one error");
-
-                iter.fold(first, |mut acc, err| {
-                    acc.combine(err);
-                    acc
-                })
-            }
+            TokenError::Multi(errs) => combine_errors(errs),
         }
     }
 }

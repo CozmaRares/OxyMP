@@ -4,6 +4,11 @@ pub fn extract_panic_message(e: &Box<dyn Any + Send + 'static>) -> Option<String
     e.downcast_ref::<String>().map(|s| s.to_string())
 }
 
+macro_rules! q {
+    () => { ::quote::quote!() };
+    ($($tt:tt)*) => { ::quote::quote!($($tt)*) };
+}
+
 macro_rules! pq {
     () => { ::syn::parse_quote!() };
     ($($tt:tt)*) => {
@@ -27,31 +32,17 @@ macro_rules! pq {
     };
 }
 
-macro_rules! q {
-    () => { ::quote::quote!() };
-    ($($tt:tt)*) => { ::quote::quote!($($tt)*) };
+macro_rules! items {
     ($($tt:tt)*) => {
         {
-            let result: Result<_, _> = ::std::panic::catch_unwind(|| {
-                ::quote::quote!($($tt)*)
-            });
-
-            match result {
-                Ok(val) => val,
-                Err(_) => {
-                    eprintln!("qoute::quote! at {}:{} paniced",
-                        file!(),
-                        line!(),
-                    );
-                    let msg = crate::macros::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
-                    panic!("{}", msg);
+            let input = q!($($tt)*);
+            let item_mod: syn::ItemMod = pq! {
+                mod a {
+                    #input
                 }
-            }
+            };
+            item_mod.content.unwrap().1
         }
-    };
-
-    ($($tt:tt)*) => {
-        ::quote::quote!($($tt)*)
     };
 }
 

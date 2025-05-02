@@ -11,18 +11,18 @@ use syn::spanned::Spanned;
 
 use helpers::{MarkerAttrError, OxyMPAttr};
 
+use crate::utils::combine_errors;
+
 #[derive(Debug)]
 pub struct Data {
     pub tokens: tokens::TokensData,
-
     pub lexers: Vec<(syn::ItemMod, lexer::LexerData)>,
+    pub initial_module: syn::ItemMod,
 
     #[cfg(feature = "rd")]
     pub rd_parsers: Vec<(syn::ItemMod, rd_parser::RDParserData)>,
-
     // #[cfg(feature = "lr")]
     // pub lr_parsers: Vec<()>,
-    pub initial_module: syn::ItemMod,
 }
 
 struct DataBuilder {
@@ -162,16 +162,10 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
             (items, errors)
         });
 
-    if errors.is_empty() {
+    if !errors.is_empty() {
+        Err(combine_errors(errors))
+    } else {
         module.content = Some((brace, items));
-        return builder.build(module);
+        builder.build(module)
     }
-
-    let mut iter = errors.into_iter();
-    let first = iter.next().expect("must have at least one error");
-
-    Err(iter.fold(first, |mut acc, err| {
-        acc.combine(err);
-        acc
-    }))
 }

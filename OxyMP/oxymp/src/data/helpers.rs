@@ -3,6 +3,8 @@ use std::collections::{HashMap, HashSet};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 
+use crate::utils::combine_errors;
+
 pub enum AttrError {
     PathArg(Span),
     SegmentError { span: Span, msg: &'static str },
@@ -70,15 +72,7 @@ impl From<MarkerAttrError> for syn::Error {
 
             MarkerAttrError::AttrSyntax(e) => e.into(),
 
-            MarkerAttrError::Multi(errs) => {
-                let mut iter = errs.into_iter().map(|err| err.into());
-                let first = iter.next().expect("must have at least one error");
-
-                iter.fold(first, |mut acc, err| {
-                    acc.combine(err);
-                    acc
-                })
-            }
+            MarkerAttrError::Multi(errs) => combine_errors(errs),
         }
     }
 }

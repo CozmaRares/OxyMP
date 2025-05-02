@@ -286,7 +286,7 @@ fn process_rules(
             TokenPattern::Exact { pattern } => pattern,
             TokenPattern::Regex { pattern, .. } => pattern,
         }
-        .clone();
+        .value();
         token_patterns.insert(pattern, variant.ident.to_string());
     }
 

@@ -8,15 +8,39 @@ use crate::{
             self, StateKind as DFAStateKind, StateTag as DFAStateTag, Transition as DFATransition,
             DFA,
         },
-        nfa::{self, NFA},
+        nfa::{self, combine, NFA},
     },
     data::{
         lexer::LexerData,
         tokens::{TokenPattern, TokensData},
     },
+    utils::combine_errors,
 };
 
 pub fn generate(
+    tokens_data: &TokensData,
+    lexers: Vec<(syn::ItemMod, LexerData)>,
+) -> syn::Result<Vec<syn::Item>> {
+    let mut lexer_cache = LexerCache::new();
+    let mut items = Vec::new();
+    let mut errors = Vec::new();
+
+    for (item_mod, lexer_data) in lexers {
+        let res = generate_one(tokens_data, lexer_data, item_mod, &mut lexer_cache);
+        match res {
+            Ok(inner_items) => items.extend(inner_items),
+            Err(err) => errors.push(err),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(items)
+    } else {
+        Err(combine_errors(errors))
+    }
+}
+
+fn generate_one(
     tokens_data: &TokensData,
     lexer_data: LexerData,
     mut item_mod: syn::ItemMod,
@@ -35,17 +59,16 @@ pub fn generate(
     };
     item_mod.content = Some((brace, lexer_items));
     items.push(syn::Item::Mod(item_mod));
-
     Ok(items)
 }
 
-pub struct LexerCache {
+struct LexerCache {
     error_idents: Option<ErrorIdents>,
     tokens_nfa: Option<NFA>,
 }
 
 impl LexerCache {
-    pub fn new() -> LexerCache {
+    fn new() -> LexerCache {
         LexerCache {
             error_idents: None,
             tokens_nfa: None,
@@ -88,8 +111,8 @@ struct ErrorIdents {
 }
 
 struct ErrorItem {
-    pub idents: ErrorIdents,
-    pub items: Vec<syn::Item>,
+    idents: ErrorIdents,
+    items: Vec<syn::Item>,
 }
 
 #[allow(non_snake_case)]
@@ -294,18 +317,15 @@ fn generate_mod(
         error_ident,
     } = error_idents;
 
-    let item_mod: syn::ItemMod = pq! {
-        mod a {
-            type Token = super::#tokens_ident;
-            pub type Error = super::#error_ident;
-            pub type LexerExpected = super::#expected_ident;
+    let items = items! {
+        type Token = super::#tokens_ident;
+        pub type Error = super::#error_ident;
+        pub type LexerExpected = super::#expected_ident;
 
-            #states
-            #(#methods)*
-            #tokenize_fn
-        }
+        #states
+        #(#methods)*
+        #tokenize_fn
     };
-    let items = item_mod.content.unwrap().1;
     Ok(items)
 }
 

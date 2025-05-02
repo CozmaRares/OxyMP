@@ -1,70 +1,93 @@
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
-use quote::format_ident;
 
 use crate::{
     data::{rd_parser::RDParserData, tokens::TokensData},
     grammar::{parse_grammar, GrammarNode, GrammarRule},
+    idents,
+    utils::combine_errors,
 };
 
-pub fn generate_mod(tokens_data: &TokensData, rd_data: RDParserData) -> syn::Result<syn::Item> {
+pub fn generate(
+    tokens_data: &TokensData,
+    rd_parsers: Vec<(syn::ItemMod, RDParserData)>,
+) -> syn::Result<Vec<syn::Item>> {
+    let mut items = Vec::new();
+    let mut errors = Vec::new();
+
+    for (item_mod, rd_data) in rd_parsers {
+        let result = generate_one(tokens_data, item_mod, rd_data);
+        match result {
+            Ok(item) => items.push(item),
+            Err(err) => errors.push(err),
+        }
+    }
+
+    if !errors.is_empty() {
+        Err(combine_errors(errors))
+    } else {
+        Ok(items)
+    }
+}
+
+fn generate_one(
+    tokens_data: &TokensData,
+    mut item_mod: syn::ItemMod,
+    rd_data: RDParserData,
+) -> syn::Result<syn::Item> {
     let vis = &rd_data.visibility;
 
     let rules = parse_grammar(tokens_data, rd_data.grammar_rules)?;
 
     let ast = generate_ast(&tokens_data.ident, &rules);
-    let parser = generate_parser(&rules);
+    let parser = generate_parser(&rules, &tokens_data.ident);
 
     let tokens_ident = &tokens_data.ident;
-    let parser_ident = &rd_data.ident;
 
-    let mod_ident = format_ident!("_{}", rd_data.ident);
-    let mod_item: syn::ItemMod = pq! {
-        #[allow(non_snake_case)]
-        #vis mod #mod_ident {
-            use super::*;
+    let parser_items = items! {
+        type Token = super::#tokens_ident;
 
-            type _internal_oxymp_Token = #tokens_ident;
-            type _internal_oxymp_Parser = #parser_ident;
-
-            #[derive(Debug, Clone)]
-            pub struct ParserInput {
-                inp: ::std::rc::Rc<[_internal_oxymp_Token]>,
-                cursor: ::core::primitive::usize,
-            }
-            impl From<Vec<_internal_oxymp_Token>> for ParserInput {
-                fn from(value: Vec<_internal_oxymp_Token>) -> Self {
-                    Self {
-                        inp: value.into(),
-                        cursor: 0,
-                    }
-                }
-            }
-
-            impl ParserInput {
-                fn peek(&self) -> Option<&_internal_oxymp_Token> {
-                    self.inp.get(self.cursor)
-                }
-
-                fn advance(&self) -> Self {
-                    Self {
-                        inp: self.inp.clone(),
-                        cursor: self.cursor + 1,
-                    }
-                }
-            }
-
-            // TODO:
-            pub type ParserError = ();
-            pub type ParserState<T> = Result<(ParserInput, T), ParserError>;
-
-            #ast
-            #parser
+        #[derive(Debug, Clone)]
+        pub struct ParserInput {
+            inp: ::std::rc::Rc<[Token]>,
+            cursor: ::core::primitive::usize,
         }
+        impl From<Vec<Token>> for ParserInput {
+            fn from(value: Vec<Token>) -> Self {
+                Self {
+                    inp: value.into(),
+                    cursor: 0,
+                }
+            }
+        }
+        impl ParserInput {
+            fn peek(&self) -> Option<&Token> {
+                self.inp.get(self.cursor)
+            }
+
+            fn advance(&self) -> Self {
+                Self {
+                    inp: self.inp.clone(),
+                    cursor: self.cursor + 1,
+                }
+            }
+        }
+
+        // TODO:
+        pub type ParserError = ();
+        pub type ParserState<T> = Result<(ParserInput, T), ParserError>;
+
+        #ast
+        #parser
     };
 
-    Ok(syn::Item::Mod(mod_item))
+    // TODO: replace unreachable! for .expect() everywhere
+    let Some((brace, _)) = item_mod.content else {
+        unreachable!("lexer module without content")
+    };
+    item_mod.content = Some((brace, parser_items));
+    Ok(syn::Item::Mod(item_mod))
 }
 
 fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStream {
@@ -79,7 +102,7 @@ fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStr
             Some(structs) => q! { #(#structs)* },
         };
 
-        let rule_ident = format_ident!("{}", name);
+        let rule_ident = idents::parser_rule(name);
 
         q! {
             #external_choices
@@ -88,6 +111,7 @@ fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStr
                 value: #main_struct
             }
 
+            // TO be used by the user
             impl #rule_ident {
                 pub fn value_ref(&self) -> &#main_struct {
                     &self.value
@@ -117,16 +141,16 @@ struct ASTNode {
 fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Ident) -> ASTNode {
     match &node {
         GrammarNode::Rule(rule) => {
-            let ident = format_ident!("{}", rule);
+            let ident = idents::parser_rule(rule);
             ASTNode {
                 main_struct: q! {::std::boxed::Box<#ident>},
                 external_choices: None,
             }
         }
         GrammarNode::Token(token) => {
-            let ident = format_ident!("{}{}", tokens_ident, token);
+            let ident = idents::token_struct(tokens_ident, token);
             ASTNode {
-                main_struct: q! { #ident },
+                main_struct: q! { super::#ident },
                 external_choices: None,
             }
         }
@@ -151,7 +175,7 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
                 .map(|d| d.main_struct)
                 .enumerate()
                 .map(|(idx, s)| {
-                    let idx_ident = format_ident!("_{}", idx + 1);
+                    let idx_ident = idents::numeric(idx + 1);
                     q! {
                         #idx_ident(#s)
                     }
@@ -159,7 +183,7 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
 
             let mut external_choices: Vec<_> =
                 defs.filter_map(|d| d.external_choices).flatten().collect();
-            let enum_ident = format_ident!("{}Choice{}", name, *choice_idx);
+            let enum_ident = idents::choice_enum(name, *choice_idx);
             external_choices.push(q! {
                 #[derive(Debug)]
                 pub enum #enum_ident {
@@ -183,24 +207,27 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
     }
 }
 
-fn generate_parser(rules: &Vec<GrammarRule>) -> TokenStream {
+fn generate_parser(rules: &Vec<GrammarRule>, tokens_ident: &syn::Ident) -> TokenStream {
     let methods = rules
         .iter()
-        .map(|GrammarRule { name, node }| generate_method(name, node, rules));
+        .map(|GrammarRule { name, node }| generate_method(name, node, rules, tokens_ident));
 
     q! {
-        impl _internal_oxymp_Parser {
-            #(#methods)*
-        }
+        #(#methods)*
     }
 }
 
-fn generate_method(name: &String, node: &GrammarNode, rules: &Vec<GrammarRule>) -> TokenStream {
-    let defs = expand_node(name, node, false, 1, rules);
+fn generate_method(
+    name: &String,
+    node: &GrammarNode,
+    rules: &Vec<GrammarRule>,
+    tokens_ident: &syn::Ident,
+) -> TokenStream {
+    let defs = expand_node(name, node, false, 1, rules, tokens_ident);
     let toks = defs.0;
     let ident = defs.1;
 
-    let rule_ident = format_ident!("{}", name);
+    let rule_ident = idents::parser_rule(name);
 
     q! {
         pub fn #rule_ident<'a>(inp: ParserInput) -> ParserState<#rule_ident> {
@@ -219,12 +246,13 @@ fn expand_node(
     needs_check: bool,
     node_idx: usize,
     rules: &Vec<GrammarRule>,
+    tokens_ident: &syn::Ident,
 ) -> (TokenStream, proc_macro2::Ident) {
-    let node_ident = format_ident!("_{}", node_idx);
+    let node_ident = idents::numeric(node_idx);
 
     let toks = match &node {
         GrammarNode::Rule(nested_rule) => {
-            let rule_ident = format_ident!("{}", nested_rule);
+            let rule_ident = idents::parser_rule(nested_rule);
             // TODO: implement depth limit
             //let dir_set = compute_dir_set(nested_rule, node, 10, &data.0);
             //let check = generate_token_check(rule, &dir_set, data.simple_types, needs_check);
@@ -232,18 +260,18 @@ fn expand_node(
             q! {
                 //#check
                 let (inp, #node_ident) =
-                    _internal_oxymp_Parser::#rule_ident(inp)
+                    #rule_ident(inp)
                         .map(|(remaining, ast)| (remaining, Box::new(ast)))?;
             }
         }
         GrammarNode::Token(token) => {
-            let token_struct_entry = format_ident!("Tok{}", token);
+            let token_struct_entry = idents::token_struct(tokens_ident, token);
 
             q! {
                 let Some(_current) = inp.peek() else {
                 return Err(()); // TODO: EOI
                 };
-                let (inp, #node_ident) = match #token_struct_entry::try_from_ref(_current) {
+                let (inp, #node_ident) = match super::#token_struct_entry::try_from_ref(_current) {
                     None => return Err(()), // TODO: Unexpected
                     Some(t) => (inp.advance(), t),
                 };
@@ -253,7 +281,7 @@ fn expand_node(
             let defs = exprs
                 .iter()
                 .enumerate()
-                .map(|(idx, expr)| expand_node(name, expr, idx != 0, idx + 1, rules));
+                .map(|(idx, expr)| expand_node(name, expr, idx != 0, idx + 1, rules, tokens_ident));
             let toks = defs.clone().map(|d| d.0);
             let idents = defs.map(|d| d.1);
 
@@ -276,10 +304,15 @@ fn expand_node(
             let defs = choices
                 .iter()
                 .enumerate()
-                .map(|(idx, expr)| (idx + 1, expand_node(name, expr, false, idx + 1, rules)))
+                .map(|(idx, expr)| {
+                    (
+                        idx + 1,
+                        expand_node(name, expr, false, idx + 1, rules, tokens_ident),
+                    )
+                })
                 .map(|(idx, (toks, ident))| {
-                    let idx_ident = format_ident!("_{}", idx);
-                    let choice_ident = format_ident!("{}Choice{}", name, choice_idx);
+                    let idx_ident = idents::numeric(idx);
+                    let choice_ident = idents::choice_enum(name, *choice_idx);
 
                     q! {
                         let r: ParserState<_> = (|| {
@@ -306,7 +339,7 @@ fn expand_node(
             }
         }
         GrammarNode::Optional(opt) => {
-            let (toks, ident) = expand_node(name, opt, false, 1, rules);
+            let (toks, ident) = expand_node(name, opt, false, 1, rules, tokens_ident);
 
             //let dir_set = compute_dir_set(rule, node, data.depth_limit, rules);
             //let check = generate_token_check(rule, &dir_set, data.simple_types, needs_check);
