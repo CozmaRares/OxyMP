@@ -37,9 +37,9 @@ mod language {
     pub mod lexer {}
 
     #[oxymp::RDParser]
-    // #[grammar(E = T T1?)]
-    // #[grammar(T1 = (r"\+" | "-") E)]
-    // #[grammar(T = Number | r"\(" E r"\)")]
+    #[grammar(E = T T1?)]
+    #[grammar(T1 = (r"\+" | "-") E)]
+    #[grammar(T = Number | r"\(" E r"\)")]
     mod rd_parser {}
 }
 use language::*;

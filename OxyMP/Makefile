@@ -24,4 +24,8 @@ expand:
 count:
 	@cd oxymp/src && cloc .
 
+clean:
+	@cargo clean
+	@cd oxymp && cargo clean
+
 .PHONY: all run trace check expand count

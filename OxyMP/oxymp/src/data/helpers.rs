@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 
@@ -234,3 +236,71 @@ pub fn get_item_ds_span(item: &syn::Item) -> proc_macro2::Span {
 
 pub const TRAILING_TOKENS_ERR: &str =
     "Unexpected remaining tokens after parsing the attribute. Remove the trailing tokens";
+
+type Map = HashMap<String, Vec<(proc_macro2::Span, proc_macro2::TokenStream)>>;
+
+pub fn process_module(item: syn::Item, known_attrs: &[&str]) -> syn::Result<(syn::ItemMod, Map)> {
+    let syn::Item::Mod(mut item) = item else {
+        return Err(syn::Error::new(
+            get_item_ds_span(&item),
+            "Item must be a module.",
+        ));
+    };
+
+    match &item.content {
+        Some((_, items)) if items.is_empty() => Ok(()),
+        Some((_, items)) => {
+            let span = items.first().expect("has 1 item").span();
+            Err((span, "No items allowed in module."))
+        }
+        None => Err((item.ident.span(), "Missing `{}`.")),
+    }
+    .map_err(|(span, msg)| {
+        let msg = format!("Module must have an empty content block. {}", msg);
+        syn::Error::new(span, msg)
+    })?;
+
+    let mut attributes = Vec::new();
+
+    let known_attrs: HashSet<_> = known_attrs.iter().copied().collect();
+    let mut found_attrs: Map = Map::new();
+
+    for attr in item.attrs {
+        let path = attr.path();
+
+        if path.segments.len() != 1 {
+            attributes.push(attr);
+            continue;
+        }
+
+        let ident = path.segments.first().unwrap().ident.clone();
+        let ident_lit = ident.to_string();
+
+        if !known_attrs.contains(ident_lit.as_str()) {
+            attributes.push(attr);
+            continue;
+        }
+
+        let tokens = parse_meta_attr(&ident_lit, attr)?;
+        found_attrs
+            .entry(ident_lit)
+            .or_default()
+            .push((ident.span(), tokens));
+    }
+
+    item.attrs = attributes;
+    Ok((item, found_attrs))
+}
+
+fn parse_meta_attr(ident_lit: &str, attr: syn::Attribute) -> syn::Result<proc_macro2::TokenStream> {
+    match attr.meta {
+        syn::Meta::List(meta_list) => Ok(meta_list.tokens),
+        _ => Err(syn::Error::new(
+            attr.span(),
+            format!(
+                "Invalid attribute. Please specify it as `#[{}(rule)]`",
+                ident_lit
+            ),
+        )),
+    }
+}

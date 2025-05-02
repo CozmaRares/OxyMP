@@ -1,6 +1,11 @@
 mod helpers;
+
+pub mod grammar;
 pub mod lexer;
 pub mod tokens;
+
+#[cfg(feature = "rd")]
+pub mod rd_parser;
 
 use syn::spanned::Spanned;
 
@@ -12,9 +17,9 @@ pub struct Data {
 
     pub lexers: Vec<(syn::ItemMod, lexer::LexerData)>,
 
-    // #[cfg(feature = "rd")]
-    // pub rd_parsers: Vec<()>,
-    //
+    #[cfg(feature = "rd")]
+    pub rd_parsers: Vec<(syn::ItemMod, rd_parser::RDParserData)>,
+
     // #[cfg(feature = "lr")]
     // pub lr_parsers: Vec<()>,
     pub initial_module: syn::ItemMod,
@@ -23,6 +28,9 @@ pub struct Data {
 struct DataBuilder {
     tokens: Vec<(proc_macro2::Span, tokens::TokensData)>,
     lexers: Vec<(syn::ItemMod, lexer::LexerData)>,
+
+    #[cfg(feature = "rd")]
+    rd_parsers: Vec<(syn::ItemMod, rd_parser::RDParserData)>,
 }
 
 impl DataBuilder {
@@ -30,6 +38,9 @@ impl DataBuilder {
         DataBuilder {
             tokens: Vec::new(),
             lexers: Vec::new(),
+
+            #[cfg(feature = "rd")]
+            rd_parsers: Vec::new(),
         }
     }
 
@@ -39,6 +50,11 @@ impl DataBuilder {
 
     fn add_lexer(&mut self, item: syn::ItemMod, data: lexer::LexerData) {
         self.lexers.push((item, data));
+    }
+
+    #[cfg(feature = "rd")]
+    fn add_rd_parser(&mut self, item: syn::ItemMod, data: rd_parser::RDParserData) {
+        self.rd_parsers.push((item, data));
     }
 
     fn build(mut self, module: syn::ItemMod) -> syn::Result<Data> {
@@ -69,6 +85,9 @@ impl DataBuilder {
             tokens: self.tokens.pop().expect("has one token").1,
             lexers: self.lexers,
             initial_module: module,
+
+            #[cfg(feature = "rd")]
+            rd_parsers: self.rd_parsers,
         })
     }
 }
@@ -123,7 +142,11 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
                 }
 
                 #[cfg(feature = "rd")]
-                OxyMPAttr::RDParser => Ok(None),
+                OxyMPAttr::RDParser => {
+                    let (item, data) = rd_parser::process_rd_parser(item)?;
+                    builder.add_rd_parser(item, data);
+                    Ok(None)
+                }
 
                 #[cfg(feature = "lr")]
                 OxyMPAttr::LRParser => Ok(None),
