@@ -54,9 +54,7 @@ fn generate_one(
     items.extend(error_items);
 
     let lexer_items = generate_mod(tokens_data, lexer_data, dfa, error_idents)?;
-    let Some((brace, _)) = item_mod.content else {
-        unreachable!("lexer module without content")
-    };
+    let (brace, _) = item_mod.content.expect("module should have content");
     item_mod.content = Some((brace, lexer_items));
     items.push(syn::Item::Mod(item_mod));
     Ok(items)

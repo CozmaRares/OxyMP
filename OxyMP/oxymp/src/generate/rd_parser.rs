@@ -82,10 +82,7 @@ fn generate_one(
         #parser
     };
 
-    // TODO: replace unreachable! for .expect() everywhere
-    let Some((brace, _)) = item_mod.content else {
-        unreachable!("lexer module without content")
-    };
+    let (brace, _) = item_mod.content.expect("module should have content");
     item_mod.content = Some((brace, parser_items));
     Ok(syn::Item::Mod(item_mod))
 }

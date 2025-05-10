@@ -49,16 +49,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tokens = lexer::tokenize(input)?;
     let ast = rd_parser::E(tokens.clone().into()).unwrap().1;
 
-    println!("{:#?}", input);
-    println!("{:#?}", tokens);
-    println!("{:#?}", ast);
+    // println!("{:#?}", input);
+    // println!("{:#?}", tokens);
+    // println!("{:#?}", ast);
     println!("{}", ast.visit());
 
     Ok(())
 }
 
 impl rd_parser::E {
-    pub fn visit(self) -> f64 {
+    fn visit(self) -> f64 {
         let (t, t1) = self.value();
         let t = t.visit();
         match t1 {
@@ -69,7 +69,7 @@ impl rd_parser::E {
 }
 
 impl rd_parser::T1 {
-    pub fn visit(self) -> f64 {
+    fn visit(self) -> f64 {
         let (sign, e) = self.value();
         match sign {
             rd_parser::T1Choice1::_1(_) => e.visit(),

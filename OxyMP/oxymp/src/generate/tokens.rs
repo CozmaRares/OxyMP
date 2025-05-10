@@ -78,7 +78,7 @@ fn generate_try_from(tokens_ident: &syn::Ident, variant: &TokenVariant) -> syn::
         syn::Fields::Named(fields_named) => {
             let iter = fields_named.named.iter().map(|field| match &field.ident {
                 Some(ident) => (ident.clone(), q! { #ident: #ident.clone() }),
-                _ => unreachable!(),
+                _ => unreachable!("named fields always have an ident"),
             });
             let (idents, idents_cloned) = split_iter(iter);
 
