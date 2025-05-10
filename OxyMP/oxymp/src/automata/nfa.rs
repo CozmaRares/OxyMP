@@ -32,7 +32,40 @@ pub enum NFACompileError {
     PatternMatchesEmptyString(String),
 }
 
-type NFACompileResult = Result<NFA, NFACompileError>;
+#[derive(Debug, Clone)]
+pub enum Transition {
+    Epsilon,
+    Char(char),
+    Chars { start: char, end: char },
+}
+
+#[derive(Debug, Clone)]
+pub enum StateKind {
+    NotAccepting,
+    Accepting,
+    Inherit,
+}
+
+#[derive(Debug, Clone)]
+pub enum StateTag {
+    Skip { pattern: String },
+    Token { variant: String, priority: usize },
+    None,
+}
+
+#[derive(Debug, Clone)]
+pub struct State {
+    pub transitions: Vec<(Transition, usize)>,
+    pub kind: StateKind,
+    pub tag: StateTag,
+}
+
+#[derive(Clone)]
+#[allow(clippy::upper_case_acronyms)]
+pub struct NFA {
+    states: HashMap<usize, State>,
+    end_state: usize,
+}
 
 pub fn compile(regex: &str, tag: StateTag) -> NFACompileResult {
     let hir = parse(regex).map_err(Box::new)?;
@@ -72,33 +105,7 @@ pub fn combine(nfas: Vec<NFA>) -> NFA {
     builder.build()
 }
 
-#[derive(Debug, Clone)]
-pub enum Transition {
-    Epsilon,
-    Char(char),
-    Chars { start: char, end: char },
-}
-
-#[derive(Debug, Clone)]
-pub enum StateKind {
-    NotAccepting,
-    Accepting,
-    Inherit,
-}
-
-#[derive(Debug, Clone)]
-pub enum StateTag {
-    Skip { pattern: String },
-    Token { variant: String, priority: usize },
-    None,
-}
-
-#[derive(Debug, Clone)]
-pub struct State {
-    pub transitions: Vec<(Transition, usize)>,
-    pub kind: StateKind,
-    pub tag: StateTag,
-}
+type NFACompileResult = Result<NFA, NFACompileError>;
 
 impl State {
     fn new(kind: StateKind) -> Self {
@@ -112,13 +119,6 @@ impl State {
     fn add_transition(&mut self, transition: Transition, target: usize) {
         self.transitions.push((transition, target));
     }
-}
-
-#[derive(Clone)]
-#[allow(clippy::upper_case_acronyms)]
-pub struct NFA {
-    states: HashMap<usize, State>,
-    end_state: usize,
 }
 
 impl NFA {

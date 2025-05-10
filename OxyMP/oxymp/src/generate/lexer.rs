@@ -8,13 +8,13 @@ use crate::{
             self, StateKind as DFAStateKind, StateTag as DFAStateTag, Transition as DFATransition,
             DFA,
         },
-        nfa::{self, combine, NFA},
+        nfa::{self, NFA},
     },
     data::{
         lexer::LexerData,
         tokens::{TokenPattern, TokensData},
     },
-    utils::combine_errors,
+    utils::FoldErrors,
 };
 
 pub fn generate(
@@ -22,22 +22,15 @@ pub fn generate(
     lexers: Vec<(syn::ItemMod, LexerData)>,
 ) -> syn::Result<Vec<syn::Item>> {
     let mut lexer_cache = LexerCache::new();
-    let mut items = Vec::new();
-    let mut errors = Vec::new();
 
-    for (item_mod, lexer_data) in lexers {
-        let res = generate_one(tokens_data, lexer_data, item_mod, &mut lexer_cache);
-        match res {
-            Ok(inner_items) => items.extend(inner_items),
-            Err(err) => errors.push(err),
-        }
-    }
+    let items = lexers
+        .into_iter()
+        .map(|(item_mod, lexer_data)| {
+            generate_one(tokens_data, lexer_data, item_mod, &mut lexer_cache)
+        })
+        .collect_errors()?;
 
-    if errors.is_empty() {
-        Ok(items)
-    } else {
-        Err(combine_errors(errors))
-    }
+    Ok(items.into_iter().flatten().collect())
 }
 
 fn generate_one(
@@ -48,12 +41,12 @@ fn generate_one(
 ) -> syn::Result<Vec<syn::Item>> {
     let mut items = Vec::new();
 
-    let dfa = generate_lexer_dfa(tokens_data, &lexer_data.skip_patterns, cache)?;
+    let dfa = generate_lexer_dfa(tokens_data, lexer_data.skip_patterns, cache)?;
 
     let (error_idents, error_items) = cache.get_error_idents();
     items.extend(error_items);
 
-    let lexer_items = generate_mod(tokens_data, lexer_data, dfa, error_idents)?;
+    let lexer_items = generate_mod(tokens_data, dfa, error_idents)?;
     let (brace, _) = item_mod.content.expect("module should have content");
     item_mod.content = Some((brace, lexer_items));
     items.push(syn::Item::Mod(item_mod));
@@ -242,7 +235,7 @@ fn generate_tokens_nfa(tokens_data: &TokensData) -> syn::Result<NFA> {
 
 fn generate_lexer_dfa(
     tokens_data: &TokensData,
-    skip_patterns: &[syn::LitStr],
+    skip_patterns: Vec<syn::LitStr>,
     cache: &mut LexerCache,
 ) -> syn::Result<DFA> {
     let token_nfa = cache.get_tokens_nfa(tokens_data)?;
@@ -278,11 +271,10 @@ fn generate_lexer_dfa(
 
 fn generate_mod(
     tokens_data: &TokensData,
-    lexer_data: LexerData,
     dfa: DFA,
     error_idents: &ErrorIdents,
 ) -> syn::Result<Vec<syn::Item>> {
-    let tokenize_fn = generate_tokenize_fn(lexer_data.visibility);
+    let tokenize_fn = generate_tokenize_fn();
 
     let states = generate_states(&dfa);
 
@@ -433,9 +425,9 @@ fn generate_state_methods<'a>(
     })
 }
 
-fn generate_tokenize_fn(vis: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn generate_tokenize_fn() -> proc_macro2::TokenStream {
     q! {
-        #vis fn tokenize(inp: &str) -> Result<Vec<Token>, Error> {
+        pub fn tokenize(inp: &str) -> Result<Vec<Token>, Error> {
             let mut toks = Vec::new();
             let mut state = State::_1;
             let mut match_start = 0;

@@ -2,105 +2,9 @@ use proc_macro2::Span;
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
-use crate::utils::{capitalize, combine_errors};
+use crate::utils::{capitalize, FoldErrors};
 
 use super::helpers::{get_item_ds_span, AttrError, TRAILING_TOKENS_ERR};
-
-enum TokenError {
-    NotEnum(Span),
-    NoVariants(Span),
-    NoPattern(Span),
-
-    MultiplePatterns {
-        variant_span: Span,
-        pattern_spans: Vec<Span>,
-    },
-    Exact(syn::Error),
-    Regex(syn::Error),
-
-    ExactData(Span),
-    RegexUnnamedNot1(Span),
-
-    AttrSyntax(AttrError),
-    Multi(Vec<TokenError>),
-}
-
-impl From<AttrError> for TokenError {
-    fn from(value: AttrError) -> TokenError {
-        TokenError::AttrSyntax(value)
-    }
-}
-
-impl From<Vec<TokenError>> for TokenError {
-    fn from(value: Vec<TokenError>) -> TokenError {
-        TokenError::Multi(value)
-    }
-}
-
-const EXACT_ATTR_FORMAT: &str = r#"#[exact("your exact string")]"#;
-const REGEX_ATTR_FORMAT: &str = r#"#[regex("your regex", function_identifier)]"#;
-
-#[inline]
-fn generate_err(err: syn::Error, correct_format: &str) -> syn::Error {
-    let span = err.span();
-    let msg = err.to_string();
-    let msg = format!("{}. The correct format is '{}'", msg, correct_format);
-    let msg = capitalize(msg);
-    syn::Error::new(span, msg)
-}
-
-impl From<TokenError> for syn::Error {
-    fn from(value: TokenError) -> Self {
-        match value {
-            TokenError::NotEnum(span) => {
-                let msg = "Item marked with #[oxymp::Tokens] must be an enum.";
-                syn::Error::new(span, msg)
-            }
-            TokenError::NoVariants(span) => {
-                let msg = "The enum has no variants defined. Define at least one variant.";
-                syn::Error::new(span, msg)
-            }
-            TokenError::NoPattern(span) => {
-                let msg = format!(
-                            "The variant has no pattern defined. Define on of the following attributes:\n\n{}\nor\n\n{}",
-                            EXACT_ATTR_FORMAT, REGEX_ATTR_FORMAT
-                        );
-                syn::Error::new(span, msg)
-            }
-
-            TokenError::MultiplePatterns {
-                variant_span,
-                pattern_spans,
-            } => {
-                let mut error = Self::new(
-                    variant_span,
-                    "Variant is makred with multiple pattern attributes.",
-                );
-
-                pattern_spans
-                    .into_iter()
-                    .map(|span| Self::new(span, "pattern attribute used here"))
-                    .for_each(|attr_err| error.combine(attr_err));
-
-                error
-            }
-            TokenError::Exact(err) => generate_err(err, EXACT_ATTR_FORMAT),
-            TokenError::Regex(err) => generate_err(err, REGEX_ATTR_FORMAT),
-
-            TokenError::ExactData(span) => {
-                let msg = "Exact tokens can't contain any data. Remove any associated data for this token variant.";
-                syn::Error::new(span, msg)
-            }
-            TokenError::RegexUnnamedNot1(span) => {
-                let msg = "Regex tokens must only contain one unnamed field.";
-                syn::Error::new(span, msg)
-            }
-
-            TokenError::AttrSyntax(e) => e.into(),
-            TokenError::Multi(errs) => combine_errors(errs),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub enum TokenPattern {
@@ -111,73 +15,6 @@ pub enum TokenPattern {
         pattern: syn::LitStr,
         transform: syn::Ident,
     },
-}
-
-impl TokenPattern {
-    pub fn span(&self) -> Span {
-        match self {
-            TokenPattern::Exact { pattern } => pattern.span(),
-            TokenPattern::Regex { pattern, .. } => pattern.span(),
-        }
-    }
-}
-
-impl TokenPattern {
-    fn parse_exact(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
-        let pattern: syn::LitStr = input.parse()?;
-
-        if !input.is_empty() {
-            return Err(syn::Error::new(input.span(), TRAILING_TOKENS_ERR))?;
-        }
-
-        Ok(TokenPattern::Exact { pattern })
-    }
-
-    fn parse_regex(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
-        let regex: syn::LitStr = input.parse()?;
-        let _comma: syn::Token![,] = input.parse()?;
-        let transform: syn::Path = input.parse()?;
-
-        if !input.is_empty() {
-            return Err(syn::Error::new(input.span(), TRAILING_TOKENS_ERR));
-        }
-
-        if transform.segments.len() != 1 {
-            let msg = "Transform function must be a single identifier. Make sure the function is accessible in the module's scope";
-            return Err(syn::Error::new(transform.span(), msg));
-        }
-
-        let transform = transform.segments.first().unwrap().ident.clone();
-
-        Ok(TokenPattern::Regex {
-            pattern: regex,
-            transform,
-        })
-    }
-
-    fn from_attr(attr: &syn::Attribute) -> Result<Option<TokenPattern>, TokenError> {
-        let path = attr.path();
-        if path.segments.len() != 1 {
-            return Ok(None);
-        }
-        let segment = path.segments.first().unwrap();
-        if segment.arguments != syn::PathArguments::None {
-            return Err(AttrError::PathArg(segment.span()).into());
-        }
-        let path_ident = segment.ident.to_string();
-
-        match path_ident.as_str() {
-            "exact" => attr
-                .parse_args_with(TokenPattern::parse_exact)
-                .map(Some)
-                .map_err(TokenError::Exact),
-            "regex" => attr
-                .parse_args_with(TokenPattern::parse_regex)
-                .map(Some)
-                .map_err(TokenError::Regex),
-            _ => Ok(None),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -274,6 +111,169 @@ fn process_tokens_impl(item: &mut syn::Item) -> Result<TokensData, TokenError> {
         visibility,
         variants,
     })
+}
+
+enum TokenError {
+    NotEnum(Span),
+    NoVariants(Span),
+    NoPattern(Span),
+
+    MultiplePatterns {
+        variant_span: Span,
+        pattern_spans: Vec<Span>,
+    },
+    Exact(syn::Error),
+    Regex(syn::Error),
+
+    ExactData(Span),
+    RegexUnnamedNot1(Span),
+
+    AttrSyntax(AttrError),
+    Multi(Vec<TokenError>),
+}
+
+impl From<AttrError> for TokenError {
+    fn from(value: AttrError) -> TokenError {
+        TokenError::AttrSyntax(value)
+    }
+}
+
+impl From<Vec<TokenError>> for TokenError {
+    fn from(value: Vec<TokenError>) -> TokenError {
+        TokenError::Multi(value)
+    }
+}
+
+const EXACT_ATTR_FORMAT: &str = r#"#[exact("your exact string")]"#;
+const REGEX_ATTR_FORMAT: &str = r#"#[regex("your regex", function_identifier)]"#;
+
+#[inline]
+fn generate_err(err: syn::Error, correct_format: &str) -> syn::Error {
+    let span = err.span();
+    let msg = err.to_string();
+    let msg = format!("{}. The correct format is '{}'", msg, correct_format);
+    let msg = capitalize(msg);
+    syn::Error::new(span, msg)
+}
+
+impl From<TokenError> for syn::Error {
+    fn from(value: TokenError) -> Self {
+        match value {
+            TokenError::NotEnum(span) => {
+                let msg = "Item marked with #[oxymp::Tokens] must be an enum.";
+                syn::Error::new(span, msg)
+            }
+            TokenError::NoVariants(span) => {
+                let msg = "The enum has no variants defined. Define at least one variant.";
+                syn::Error::new(span, msg)
+            }
+            TokenError::NoPattern(span) => {
+                let msg = format!(
+                            "The variant has no pattern defined. Define on of the following attributes:\n\n{}\nor\n\n{}",
+                            EXACT_ATTR_FORMAT, REGEX_ATTR_FORMAT
+                        );
+                syn::Error::new(span, msg)
+            }
+
+            TokenError::MultiplePatterns {
+                variant_span,
+                pattern_spans,
+            } => {
+                let mut error = Self::new(
+                    variant_span,
+                    "Variant is makred with multiple pattern attributes.",
+                );
+
+                pattern_spans
+                    .into_iter()
+                    .map(|span| Self::new(span, "pattern attribute used here"))
+                    .for_each(|attr_err| error.combine(attr_err));
+
+                error
+            }
+            TokenError::Exact(err) => generate_err(err, EXACT_ATTR_FORMAT),
+            TokenError::Regex(err) => generate_err(err, REGEX_ATTR_FORMAT),
+
+            TokenError::ExactData(span) => {
+                let msg = "Exact tokens can't contain any data. Remove any associated data for this token variant.";
+                syn::Error::new(span, msg)
+            }
+            TokenError::RegexUnnamedNot1(span) => {
+                let msg = "Regex tokens must only contain one unnamed field.";
+                syn::Error::new(span, msg)
+            }
+
+            TokenError::AttrSyntax(e) => e.into(),
+            TokenError::Multi(errs) => errs.collect_errors(),
+        }
+    }
+}
+
+impl TokenPattern {
+    pub fn span(&self) -> Span {
+        match self {
+            TokenPattern::Exact { pattern } => pattern.span(),
+            TokenPattern::Regex { pattern, .. } => pattern.span(),
+        }
+    }
+}
+
+impl TokenPattern {
+    fn parse_exact(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
+        let pattern: syn::LitStr = input.parse()?;
+
+        if !input.is_empty() {
+            return Err(syn::Error::new(input.span(), TRAILING_TOKENS_ERR))?;
+        }
+
+        Ok(TokenPattern::Exact { pattern })
+    }
+
+    fn parse_regex(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
+        let regex: syn::LitStr = input.parse()?;
+        let _comma: syn::Token![,] = input.parse()?;
+        let transform: syn::Path = input.parse()?;
+
+        if !input.is_empty() {
+            return Err(syn::Error::new(input.span(), TRAILING_TOKENS_ERR));
+        }
+
+        if transform.segments.len() != 1 {
+            let msg = "Transform function must be a single identifier. Make sure the function is accessible in the module's scope";
+            return Err(syn::Error::new(transform.span(), msg));
+        }
+
+        let transform = transform.segments.first().unwrap().ident.clone();
+
+        Ok(TokenPattern::Regex {
+            pattern: regex,
+            transform,
+        })
+    }
+
+    fn from_attr(attr: &syn::Attribute) -> Result<Option<TokenPattern>, TokenError> {
+        let path = attr.path();
+        if path.segments.len() != 1 {
+            return Ok(None);
+        }
+        let segment = path.segments.first().unwrap();
+        if segment.arguments != syn::PathArguments::None {
+            return Err(AttrError::PathArg(segment.span()).into());
+        }
+        let path_ident = segment.ident.to_string();
+
+        match path_ident.as_str() {
+            "exact" => attr
+                .parse_args_with(TokenPattern::parse_exact)
+                .map(Some)
+                .map_err(TokenError::Exact),
+            "regex" => attr
+                .parse_args_with(TokenPattern::parse_regex)
+                .map(Some)
+                .map_err(TokenError::Regex),
+            _ => Ok(None),
+        }
+    }
 }
 
 fn remove_first_pattern_attr(

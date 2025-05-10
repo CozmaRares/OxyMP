@@ -10,7 +10,6 @@ macro_rules! q {
 }
 
 macro_rules! pq {
-    () => { ::syn::parse_quote!() };
     ($($tt:tt)*) => {
         {
             let result: Result<_, _> = ::std::panic::catch_unwind(|| {

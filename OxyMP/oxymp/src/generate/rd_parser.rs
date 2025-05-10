@@ -6,29 +6,18 @@ use crate::{
     data::{rd_parser::RDParserData, tokens::TokensData},
     grammar::{parse_grammar, GrammarNode, GrammarRule},
     idents,
-    utils::combine_errors,
+    utils::FoldErrors,
 };
 
 pub fn generate(
     tokens_data: &TokensData,
     rd_parsers: Vec<(syn::ItemMod, RDParserData)>,
 ) -> syn::Result<Vec<syn::Item>> {
-    let mut items = Vec::new();
-    let mut errors = Vec::new();
-
-    for (item_mod, rd_data) in rd_parsers {
-        let result = generate_one(tokens_data, item_mod, rd_data);
-        match result {
-            Ok(item) => items.push(item),
-            Err(err) => errors.push(err),
-        }
-    }
-
-    if !errors.is_empty() {
-        Err(combine_errors(errors))
-    } else {
-        Ok(items)
-    }
+    let items = rd_parsers
+        .into_iter()
+        .map(|(item_mod, rd_data)| generate_one(tokens_data, item_mod, rd_data))
+        .collect_errors()?;
+    Ok(items)
 }
 
 fn generate_one(
@@ -36,8 +25,6 @@ fn generate_one(
     mut item_mod: syn::ItemMod,
     rd_data: RDParserData,
 ) -> syn::Result<syn::Item> {
-    let vis = &rd_data.visibility;
-
     let rules = parse_grammar(tokens_data, rd_data.grammar_rules)?;
 
     let ast = generate_ast(&tokens_data.ident, &rules);

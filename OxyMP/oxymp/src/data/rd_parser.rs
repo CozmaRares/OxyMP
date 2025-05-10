@@ -1,17 +1,14 @@
-use quote::ToTokens;
-
-use super::{grammar::GrammarData, helpers::process_module};
-
-const ATTRIBUTES: &[&str] = &["grammar"];
+use super::{grammar::GrammarData, helpers::process_module_helper};
 
 #[derive(Debug)]
 pub struct RDParserData {
-    pub visibility: proc_macro2::TokenStream,
     pub grammar_rules: Vec<GrammarData>,
 }
 
+const ATTRIBUTES: &[&str] = &["grammar"];
+
 pub(super) fn process_rd_parser(item: syn::Item) -> syn::Result<(syn::ItemMod, RDParserData)> {
-    let (item, mut found_attrs) = process_module(item, ATTRIBUTES)?;
+    let (item, mut found_attrs) = process_module_helper(item, ATTRIBUTES)?;
 
     let grammar_attrs = found_attrs
         .remove("grammar")
@@ -22,12 +19,9 @@ pub(super) fn process_rd_parser(item: syn::Item) -> syn::Result<(syn::ItemMod, R
         .map(|(span, rule)| GrammarData { span, rule })
         .collect();
 
-    let visibility = item.vis.to_token_stream();
-
     Ok((
         item,
         RDParserData {
-            visibility,
             grammar_rules,
         },
     ))

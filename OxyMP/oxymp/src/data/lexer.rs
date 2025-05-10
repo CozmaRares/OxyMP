@@ -5,10 +5,10 @@ use super::helpers::{get_item_ds_span, TRAILING_TOKENS_ERR};
 
 #[derive(Debug)]
 pub struct LexerData {
-    pub visibility: proc_macro2::TokenStream,
     pub skip_patterns: Vec<syn::LitStr>,
 }
 
+// TODO refactor with process_module_helper
 pub(super) fn process_lexer(item: syn::Item) -> syn::Result<(syn::ItemMod, LexerData)> {
     let syn::Item::Mod(mut item) = item else {
         return Err(syn::Error::new(
@@ -30,8 +30,6 @@ pub(super) fn process_lexer(item: syn::Item) -> syn::Result<(syn::ItemMod, Lexer
         syn::Error::new(span, msg)
     })?;
 
-    let visibility = item.vis.to_token_stream();
-
     let mut skip_patterns = Vec::new();
     let mut attributes = Vec::new();
 
@@ -51,7 +49,6 @@ pub(super) fn process_lexer(item: syn::Item) -> syn::Result<(syn::ItemMod, Lexer
     Ok((
         item,
         LexerData {
-            visibility,
             skip_patterns,
         },
     ))

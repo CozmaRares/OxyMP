@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use proc_macro2::Span;
 use syn::spanned::Spanned;
 
-use crate::utils::combine_errors;
+use crate::utils::FoldErrors;
 
 pub enum AttrError {
     PathArg(Span),
@@ -72,7 +72,7 @@ impl From<MarkerAttrError> for syn::Error {
 
             MarkerAttrError::AttrSyntax(e) => e.into(),
 
-            MarkerAttrError::Multi(errs) => combine_errors(errs),
+            MarkerAttrError::Multi(errs) => errs.collect_errors(),
         }
     }
 }
@@ -87,8 +87,6 @@ pub enum OxyMPAttr {
     #[cfg(feature = "lr")]
     LRParser,
 }
-
-const ATTR_SEGMENT_ERR: &str = "Attribute containing 'oxymp' must have exactly two path segments. Make sure it is in the form of #[oxymp::feature].";
 
 impl OxyMPAttr {
     fn from_attr(attr: syn::Attribute) -> Result<(OxyMPAttr, Span), MarkerAttrError> {
@@ -109,7 +107,7 @@ impl OxyMPAttr {
         if segments.len() != 2 {
             errors.push(AttrError::SegmentError {
                 span,
-                msg: ATTR_SEGMENT_ERR,
+                msg: "Attribute containing 'oxymp' must have exactly two path segments. Make sure it is in the form of #[oxymp::feature].",
             });
         }
 
@@ -233,7 +231,7 @@ pub const TRAILING_TOKENS_ERR: &str =
 
 type Map = HashMap<String, Vec<(proc_macro2::Span, proc_macro2::TokenStream)>>;
 
-pub fn process_module(item: syn::Item, known_attrs: &[&str]) -> syn::Result<(syn::ItemMod, Map)> {
+pub fn process_module_helper(item: syn::Item, known_attrs: &[&str]) -> syn::Result<(syn::ItemMod, Map)> {
     let syn::Item::Mod(mut item) = item else {
         return Err(syn::Error::new(
             get_item_ds_span(&item),
@@ -275,7 +273,15 @@ pub fn process_module(item: syn::Item, known_attrs: &[&str]) -> syn::Result<(syn
             continue;
         }
 
-        let tokens = parse_meta_attr(&ident_lit, attr)?;
+        let tokens = if let syn::Meta::List(meta_list) = attr.meta {
+            meta_list.tokens
+        } else {
+            return Err(syn::Error::new(
+                attr.span(),
+                format!("Invalid attribute. Expected `#[{}(...)]`", ident_lit),
+            ));
+        };
+
         found_attrs
             .entry(ident_lit)
             .or_default()
@@ -284,17 +290,4 @@ pub fn process_module(item: syn::Item, known_attrs: &[&str]) -> syn::Result<(syn
 
     item.attrs = attributes;
     Ok((item, found_attrs))
-}
-
-fn parse_meta_attr(ident_lit: &str, attr: syn::Attribute) -> syn::Result<proc_macro2::TokenStream> {
-    match attr.meta {
-        syn::Meta::List(meta_list) => Ok(meta_list.tokens),
-        _ => Err(syn::Error::new(
-            attr.span(),
-            format!(
-                "Invalid attribute. Please specify it as `#[{}(rule)]`",
-                ident_lit
-            ),
-        )),
-    }
 }

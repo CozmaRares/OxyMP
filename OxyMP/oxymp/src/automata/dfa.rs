@@ -2,6 +2,36 @@ use std::collections::{HashMap, HashSet};
 
 use super::nfa;
 
+#[derive(Debug, Clone)]
+pub enum Transition {
+    Char(char),
+    Chars { start: char, end: char },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StateTag {
+    Skip { pattern: String },
+    Token { variant: String, priority: usize },
+}
+
+#[derive(Debug, Clone)]
+pub enum StateKind {
+    NotAccepting,
+    Accepting(StateTag),
+}
+
+#[derive(Debug, Clone)]
+pub struct State {
+    pub transitions: Vec<(Transition, usize)>,
+    pub kind: StateKind,
+}
+
+#[derive(Clone)]
+#[allow(clippy::upper_case_acronyms)]
+pub struct DFA {
+    states: HashMap<usize, State>,
+}
+
 pub fn compile(nfa: nfa::NFA) -> DFA {
     let alphabet = compute_alphabet(&nfa);
     let mut builder = DFABuilder::new(&nfa);
@@ -147,18 +177,6 @@ fn compute_alphabet(nfa: &nfa::NFA) -> HashSet<char> {
     alphabet
 }
 
-#[derive(Debug, Clone)]
-pub enum Transition {
-    Char(char),
-    Chars { start: char, end: char },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum StateTag {
-    Skip { pattern: String },
-    Token { variant: String, priority: usize },
-}
-
 impl TryFrom<nfa::StateTag> for StateTag {
     type Error = ();
 
@@ -169,12 +187,6 @@ impl TryFrom<nfa::StateTag> for StateTag {
             nfa::StateTag::Skip { pattern } => Ok(StateTag::Skip { pattern }),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum StateKind {
-    NotAccepting,
-    Accepting(StateTag),
 }
 
 impl StateKind {
@@ -201,12 +213,6 @@ impl StateKind {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct State {
-    pub transitions: Vec<(Transition, usize)>,
-    pub kind: StateKind,
-}
-
 impl State {
     fn new(kind: StateKind) -> Self {
         Self {
@@ -218,12 +224,6 @@ impl State {
     fn add_transition(&mut self, transition: Transition, target: usize) {
         self.transitions.push((transition, target));
     }
-}
-
-#[derive(Clone)]
-#[allow(clippy::upper_case_acronyms)]
-pub struct DFA {
-    states: HashMap<usize, State>,
 }
 
 impl DFA {
@@ -306,12 +306,12 @@ impl std::fmt::Debug for DFA {
     }
 }
 
-struct DFAState {
+struct BuilderState {
     nfa_equivalent_states: HashSet<usize>,
     state: State,
 }
 
-impl DFAState {
+impl BuilderState {
     fn new(nfa_equivalent_states: HashSet<usize>, state: State) -> Self {
         Self {
             nfa_equivalent_states,
@@ -326,7 +326,7 @@ impl DFAState {
 
 struct DFABuilder<'a> {
     nfa: &'a nfa::NFA,
-    states: HashMap<usize, DFAState>,
+    states: HashMap<usize, BuilderState>,
     state_id_counter: usize,
     unmarked_states: HashSet<usize>,
 }
@@ -365,7 +365,7 @@ impl<'a> DFABuilder<'a> {
 
         self.state_id_counter += 1;
         let id = self.state_id_counter;
-        let state = DFAState::new(nfa_equivalent_states, State::new(kind));
+        let state = BuilderState::new(nfa_equivalent_states, State::new(kind));
         self.states.insert(id, state);
         self.unmarked_states.insert(id);
         id
