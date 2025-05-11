@@ -231,7 +231,10 @@ pub const TRAILING_TOKENS_ERR: &str =
 
 type Map = HashMap<String, Vec<(proc_macro2::Span, proc_macro2::TokenStream)>>;
 
-pub fn process_module_helper(item: syn::Item, known_attrs: &[&str]) -> syn::Result<(syn::ItemMod, Map)> {
+pub fn process_module_helper(
+    item: syn::Item,
+    known_attrs: &[&str],
+) -> syn::Result<(syn::ItemMod, Map)> {
     let syn::Item::Mod(mut item) = item else {
         return Err(syn::Error::new(
             get_item_ds_span(&item),
@@ -255,7 +258,7 @@ pub fn process_module_helper(item: syn::Item, known_attrs: &[&str]) -> syn::Resu
     let mut attributes = Vec::new();
 
     let known_attrs: HashSet<_> = known_attrs.iter().copied().collect();
-    let mut found_attrs: Map = Map::new();
+    let mut found_attrs = Map::new();
 
     for attr in item.attrs {
         let path = attr.path();

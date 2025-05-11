@@ -46,7 +46,7 @@ fn generate_one(
     let (error_idents, error_items) = cache.get_error_idents();
     items.extend(error_items);
 
-    let lexer_items = generate_mod(tokens_data, dfa, error_idents)?;
+    let lexer_items = generate_mod(tokens_data, dfa, error_idents, lexer_data.user_error_ident)?;
     let (brace, _) = item_mod.content.expect("module should have content");
     item_mod.content = Some((brace, lexer_items));
     items.push(syn::Item::Mod(item_mod));
@@ -144,16 +144,16 @@ fn generate_error_ds() -> ErrorItem {
         // needs refactor of accept fns
         // accept and reject
         #[derive(Debug)]
-        pub enum #LexerError {
+        pub enum #LexerError<T> where T: std::error::Error {
             Native {
                 unexpected_char: char,
                 expected: Vec<#LexerExpected>,
             },
-            UserTransform(Box<dyn std::error::Error>),
+            UserTransform(T),
         }
 
-        impl std::error::Error for #LexerError {}
-        impl std::fmt::Display for #LexerError {
+        impl<T: std::error::Error> std::error::Error for #LexerError<T> {}
+        impl<T: std::error::Error> std::fmt::Display for #LexerError<T> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
                     #LexerError::Native {
@@ -258,6 +258,7 @@ fn generate_mod(
     tokens_data: &TokensData,
     dfa: DFA,
     error_idents: &ErrorIdents,
+    user_error_ident: syn::Ident,
 ) -> syn::Result<Vec<syn::Item>> {
     let tokenize_fn = generate_tokenize_fn();
 
@@ -275,7 +276,7 @@ fn generate_mod(
                 TokenPattern::Regex { transform, .. } => q! {
                     super::#transform(inp)
                         .map(Token::#variant_ident)
-                        .map_err(|e| Error::UserTransform(Box::new(e)))?
+                        .map_err(Error::UserTransform)?
                 },
             };
 
@@ -294,7 +295,7 @@ fn generate_mod(
 
     let items = items! {
         type Token = super::#tokens_ident;
-        pub type Error = super::#error_ident;
+        pub type Error = super::#error_ident<super::#user_error_ident>;
         pub type LexerExpected = super::#expected_ident;
 
         #states

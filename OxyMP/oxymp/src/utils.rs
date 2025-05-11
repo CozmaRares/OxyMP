@@ -44,3 +44,28 @@ impl<T, E: Into<syn::Error>, Iter: IntoIterator<Item = Result<T, E>>>
         }
     }
 }
+
+struct SynErrorWrapper(proc_macro2::Span, &'static str);
+impl Into<syn::Error> for SynErrorWrapper {
+    fn into(self) -> syn::Error {
+        syn::Error::new(self.0, self.1)
+    }
+}
+
+pub fn multiple_attribute_error(
+    spans: Vec<proc_macro2::Span>,
+    primary_message: &'static str,
+    additional_message: &'static str,
+) -> syn::Error {
+    spans
+        .into_iter()
+        .enumerate()
+        .map(|(idx, span)| {
+            if idx == 0 {
+                SynErrorWrapper(span, primary_message)
+            } else {
+                SynErrorWrapper(span, additional_message)
+            }
+        })
+        .collect_errors()
+}

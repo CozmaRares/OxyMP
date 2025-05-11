@@ -34,6 +34,7 @@ mod language {
 
     #[oxymp::Lexer]
     #[skip(r"[ \t]+")]
+    #[error(TokenizeError)]
     pub mod lexer {}
 
     #[oxymp::RDParser]

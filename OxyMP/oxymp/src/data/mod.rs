@@ -11,7 +11,7 @@ use syn::spanned::Spanned;
 
 use helpers::{MarkerAttrError, OxyMPAttr};
 
-use crate::utils::FoldErrors;
+use crate::utils::{multiple_attribute_error, FoldErrors};
 
 #[derive(Debug)]
 pub struct Data {
@@ -130,16 +130,14 @@ impl DataBuilder {
             1 => {}
 
             _ => {
-                let msg = "Module marked with #[oxymp] must contain only one enum marked with #[oxymp::Tokens].";
-                let mut iter = self.tokens.into_iter();
-                let first = syn::Error::new(iter.next().expect("has at least 2 tokens").0, msg);
+                let primary = "Module marked with #[oxymp] must contain only one enum marked with #[oxymp::Tokens].";
+                let additional = "Token target defined here.";
 
-                let err = iter.fold(first, |mut acc, (span, _)| {
-                    acc.combine(syn::Error::new(span, "new token target found here"));
-                    acc
-                });
-
-                return Err(err);
+                return Err(multiple_attribute_error(
+                    self.tokens.iter().map(|(span, _)| *span).collect(),
+                    primary,
+                    additional,
+                ));
             }
         }
 
