@@ -111,15 +111,13 @@ fn generate_error_ds() -> ErrorItem {
     let LexerExpected = format_ident!("__Lexer_Common_Expected_{}", rand::random::<u64>());
     let LexerError = format_ident!("__Lexer_Common_Error_{}", rand::random::<u64>());
 
-    let expected_enum: syn::ItemEnum = pq! {
+    let items = items! {
         #[derive(Debug)]
         pub enum #LexerExpected {
             Char(char),
             CharRange { start: char, end: char },
         }
-    };
 
-    let expected_display: syn::ItemImpl = pq! {
         impl std::fmt::Display for #LexerExpected {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let print_char = |f: &mut std::fmt::Formatter<'_>, c: &char| {
@@ -141,9 +139,7 @@ fn generate_error_ds() -> ErrorItem {
                 }
             }
         }
-    };
 
-    let error_enum: syn::ItemEnum = pq! {
         // TODO: add location
         // needs refactor of accept fns
         // accept and reject
@@ -155,13 +151,8 @@ fn generate_error_ds() -> ErrorItem {
             },
             UserTransform(Box<dyn std::error::Error>),
         }
-    };
 
-    let error_error: syn::ItemImpl = pq! {
         impl std::error::Error for #LexerError {}
-    };
-
-    let error_display: syn::ItemImpl = pq! {
         impl std::fmt::Display for #LexerError {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
@@ -191,13 +182,7 @@ fn generate_error_ds() -> ErrorItem {
             expected_ident: LexerExpected,
             error_ident: LexerError,
         },
-        items: vec![
-            syn::Item::Enum(expected_enum),
-            syn::Item::Impl(expected_display),
-            syn::Item::Enum(error_enum),
-            syn::Item::Impl(error_error),
-            syn::Item::Impl(error_display),
-        ],
+        items,
     }
 }
 
