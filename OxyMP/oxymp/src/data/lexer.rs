@@ -1,57 +1,25 @@
-use quote::ToTokens;
-use syn::spanned::Spanned;
+use crate::utils::FoldErrors;
 
-use super::helpers::{get_item_ds_span, TRAILING_TOKENS_ERR};
+use super::helpers::{process_module_helper, TRAILING_TOKENS_ERR};
 
 #[derive(Debug)]
 pub struct LexerData {
     pub skip_patterns: Vec<syn::LitStr>,
 }
 
-// TODO refactor with process_module_helper
+const ATTRIBUTES: &[&str] = &["skip"];
+
 pub(super) fn process_lexer(item: syn::Item) -> syn::Result<(syn::ItemMod, LexerData)> {
-    let syn::Item::Mod(mut item) = item else {
-        return Err(syn::Error::new(
-            get_item_ds_span(&item),
-            "Item must be a module.",
-        ));
-    };
+    let (item, mut found_attrs) = process_module_helper(item, ATTRIBUTES)?;
 
-    match &item.content {
-        Some((_, items)) if items.is_empty() => Ok(()),
-        Some((_, items)) => {
-            let span = items.first().expect("has 1 item").span();
-            Err((span, "No items allowed in lexer module."))
-        }
-        None => Err((item.ident.span(), "Missing `{}`.")),
-    }
-    .map_err(|(span, msg)| {
-        let msg = format!("Lexer module must have an empty content block. {}", msg);
-        syn::Error::new(span, msg)
-    })?;
+    let skip_patterns = found_attrs
+        .remove("skip")
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(_, toks)| syn::parse2::<SkipAttr>(toks).map(|res| res.0))
+        .collect_errors()?;
 
-    let mut skip_patterns = Vec::new();
-    let mut attributes = Vec::new();
-
-    for attr in item.attrs {
-        let path = attr.path();
-
-        if path.is_ident("skip") {
-            let skip_attr: SkipAttr = attr.parse_args()?;
-            skip_patterns.push(skip_attr.0);
-        } else {
-            attributes.push(attr);
-        }
-    }
-
-    item.attrs = attributes;
-
-    Ok((
-        item,
-        LexerData {
-            skip_patterns,
-        },
-    ))
+    Ok((item, LexerData { skip_patterns }))
 }
 
 struct SkipAttr(syn::LitStr);
