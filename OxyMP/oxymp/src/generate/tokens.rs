@@ -1,8 +1,11 @@
+#![allow(non_snake_case)]
+
 use quote::ToTokens;
 
 use crate::{
     data::tokens::{TokenVariant, TokensData},
     idents,
+    symbols::*,
 };
 
 // TODO: consider a cleanup
@@ -59,8 +62,10 @@ fn generate_struct(
         q! { ; }
     };
 
+    let _Debug = Derive::Debug.path();
+
     pq! {
-        #[derive(Debug)]
+        #[derive(#_Debug)]
         #visibility struct #struct_ident #pub_fields #trailing_semi
     }
 }
@@ -74,6 +79,7 @@ fn generate_try_from(tokens_ident: &syn::Ident, variant: &TokenVariant) -> syn::
 
     let struct_ident = idents::token_struct(tokens_ident, variant_ident);
 
+    // FIX: Clone could not be derived for the fields
     let (fields_stream, fields_cloned) = match fields {
         syn::Fields::Named(fields_named) => {
             let iter = fields_named.named.iter().map(|field| match &field.ident {
@@ -97,12 +103,16 @@ fn generate_try_from(tokens_ident: &syn::Ident, variant: &TokenVariant) -> syn::
         syn::Fields::Unit => (q! {}, q! {}),
     };
 
+    let _Option = Std::Option.path();
+    let _Some = Std::Some.path();
+    let _None = Std::None.path();
+
     pq! {
         impl #struct_ident {
-            fn try_from_ref(value: &#tokens_ident) -> Option<Self> {
+            fn try_from_ref(value: &#tokens_ident) -> #_Option<Self> {
                 match value {
-                    #tokens_ident::#variant_ident #fields_stream => Some(Self #fields_cloned),
-                    _ => None,
+                    #tokens_ident::#variant_ident #fields_stream => #_Some(Self #fields_cloned),
+                    _ => #_None,
                 }
             }
         }

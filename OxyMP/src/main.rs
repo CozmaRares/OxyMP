@@ -11,6 +11,7 @@ mod language {
     pub enum Tok {
         #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
         Number(f64),
+
         #[exact(r"\(")]
         ParenLeft,
 

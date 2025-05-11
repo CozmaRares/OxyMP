@@ -321,7 +321,7 @@ fn classify_rules(
                     ),
                     syn::Error::new(
                         prev_span,
-                        "There is a name conflict with a rule of the same name.",
+                        "Rule previously defined here.",
                     ),
                 ]
                 .collect_errors()),
@@ -332,7 +332,7 @@ fn classify_rules(
                     ),
                     syn::Error::new(
                         prev_span,
-                        "There is a name conflict with a rule of the same name.",
+                        "Token previously defined here.",
                     ),
                 ]
                 .collect_errors()),

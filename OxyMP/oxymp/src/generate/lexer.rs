@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use std::collections::HashMap;
 
 use quote::format_ident;
@@ -14,6 +16,7 @@ use crate::{
         lexer::LexerData,
         tokens::{TokenPattern, TokensData},
     },
+    symbols::*,
     utils::FoldErrors,
 };
 
@@ -106,26 +109,37 @@ struct ErrorItem {
     items: Vec<syn::Item>,
 }
 
-#[allow(non_snake_case)]
 fn generate_error_ds() -> ErrorItem {
     let LexerExpected = format_ident!("__Lexer_Common_Expected_{}", rand::random::<u64>());
     let LexerError = format_ident!("__Lexer_Common_Error_{}", rand::random::<u64>());
 
+    let _char = Core::Char.path();
+    let _Display = Trait::Display.path();
+    let _Error = Trait::Error.path();
+    let _Formatter = Std::Formatter.path();
+    let _FmtResult = Std::FmtResult.path();
+    let _write = Macro::Write.path();
+    let _usize = Core::Usize.path();
+    let _Vec = Std::Vec.path();
+    let _format = Macro::Format.path();
+    let _writeln = Macro::Writeln.path();
+    let _Debug = Derive::Debug.path();
+
     let items = items! {
-        #[derive(Debug)]
+        #[derive(#_Debug)]
         pub enum #LexerExpected {
-            Char(char),
-            CharRange { start: char, end: char },
+            Char(#_char),
+            CharRange { start: #_char, end: #_char },
         }
 
-        impl std::fmt::Display for #LexerExpected {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let print_char = |f: &mut std::fmt::Formatter<'_>, c: &char| {
+        impl #_Display for #LexerExpected {
+            fn fmt(&self, f: &mut #_Formatter<'_>) -> #_FmtResult {
+                let print_char = |f: &mut #_Formatter<'_>, c: &#_char| {
                     if c.is_whitespace() {
-                        write!(f, "whitespace(code {})", *c as usize)
+                        #_write!(f, "whitespace(code {})", *c as #_usize)
                     }
                     else {
-                        write!(f, "'{}", c)
+                        #_write!(f, "'{}", c)
                     }
                 };
 
@@ -133,28 +147,25 @@ fn generate_error_ds() -> ErrorItem {
                     #LexerExpected::Char(c) => print_char(f, c),
                     #LexerExpected::CharRange { start, end } => {
                         print_char(f, start)?;
-                        write!(f, "..=")?;
+                        #_write!(f, "..=")?;
                         print_char(f, end)
                     }
                 }
             }
         }
 
-        // TODO: add location
-        // needs refactor of accept fns
-        // accept and reject
-        #[derive(Debug)]
-        pub enum #LexerError<T> where T: std::error::Error {
+        #[derive(#_Debug)]
+        pub enum #LexerError<T> where T: #_Error {
             Native {
-                unexpected_char: char,
-                expected: Vec<#LexerExpected>,
+                unexpected_char: #_char,
+                expected: #_Vec<#LexerExpected>,
             },
             UserTransform(T),
         }
 
-        impl<T: std::error::Error> std::error::Error for #LexerError<T> {}
-        impl<T: std::error::Error> std::fmt::Display for #LexerError<T> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl<T: #_Error> #_Error for #LexerError<T> {}
+        impl<T: #_Error> #_Display for #LexerError<T> {
+            fn fmt(&self, f: &mut #_Formatter<'_>) -> #_FmtResult {
                 match self {
                     #LexerError::Native {
                         unexpected_char,
@@ -162,16 +173,16 @@ fn generate_error_ds() -> ErrorItem {
                     } => {
                         let expected = expected
                             .iter()
-                            .map(|expected| format!("{}", expected))
-                            .collect::<Vec<_>>()
+                            .map(|expected| #_format!("{}", expected))
+                            .collect::<#_Vec<_>>()
                             .join(", ");
-                        write!(
+                        #_writeln!(
                             f,
                             "Unexpected character '{}'\nExpected: {}",
                             unexpected_char, expected
                         )
                     }
-                    #LexerError::UserTransform(e) => write!(f, "User transform error: {}", e),
+                    #LexerError::UserTransform(e) => #_writeln!(f, "User transform error: {}", e),
                 }
             }
         }
@@ -223,8 +234,6 @@ fn generate_lexer_dfa(
     skip_patterns: Vec<syn::LitStr>,
     cache: &mut LexerCache,
 ) -> syn::Result<DFA> {
-    let token_nfa = cache.get_tokens_nfa(tokens_data)?;
-
     let mut nfas = Vec::new();
 
     for pattern_lit in skip_patterns {
@@ -248,7 +257,9 @@ fn generate_lexer_dfa(
         nfas.push(nfa);
     }
 
+    let token_nfa = cache.get_tokens_nfa(tokens_data)?;
     nfas.push(token_nfa.clone());
+
     let nfa = nfa::combine(nfas);
     let dfa = dfa::compile(nfa);
     Ok(dfa)
@@ -320,8 +331,14 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
         .iter()
         .map(|ident| q! { State::#ident => #ident::accept(inp, c), });
 
+    let _Option = Std::Option.path();
+    let _char = Core::Char.path();
+    let _str = Core::Str.path();
+    let _Result = Std::Result.path();
+    let _Debug = Derive::Debug.path();
+
     q! {
-        #[derive(Debug)]
+        #[derive(#_Debug)]
         enum State {
             #(#idents),*
         }
@@ -329,13 +346,13 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
         #(#state_structs)*
 
         impl State {
-            fn transition(&self, c: char) -> Option<State> {
+            fn transition(&self, c: #_char) -> #_Option<State> {
                 match self {
                     #(#transition_branches)*
                 }
             }
 
-            fn accept(&self, inp: &str, c: char) -> Result<Option<Token>, Error> {
+            fn accept(&self, inp: &#_str, c: #_char) -> #_Result<#_Option<Token>, Error> {
                 match self {
                     #(#accept_branches)*
                 }
@@ -348,10 +365,20 @@ fn generate_state_methods<'a>(
     dfa: &'a DFA,
     token_transforms: &'a HashMap<String, proc_macro2::TokenStream>,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
+    let _Some = Std::Some.path();
+    let _Err = Std::Err.path();
+    let _vec = Macro::Vec.path();
+    let _Ok = Std::Ok.path();
+    let _None = Std::None.path();
+    let _char = Core::Char.path();
+    let _Option = Std::Option.path();
+    let _str = Core::Str.path();
+    let _Result = Std::Result.path();
+
     dfa.states().iter().map(move |(state_id, state)| {
         let transition_branches = state.transitions.iter().map(|(transition, target)| {
             let target = format_ident!("_{}", target);
-            let target = q! { Some(State::#target) };
+            let target = q! { #_Some(State::#target) };
             match transition {
                 DFATransition::Char(c) => q! { #c => #target, },
                 DFATransition::Chars { start, end } => q! { #start..=#end => #target, },
@@ -373,10 +400,10 @@ fn generate_state_methods<'a>(
                     });
 
                 q! {
-                    Err(
+                    #_Err(
                         Error::Native {
                             unexpected_char: current_char,
-                            expected: vec![ #(#expected),* ]
+                            expected: #_vec![ #(#expected),* ]
                         }
                     )
                 }
@@ -386,9 +413,9 @@ fn generate_state_methods<'a>(
                     let transform = token_transforms
                         .get(variant)
                         .expect("token pattern should always have an transform");
-                    q! { Ok(Some(#transform)) }
+                    q! { #_Ok(#_Some(#transform)) }
                 }
-                DFAStateTag::Skip { .. } => q! { Ok(None) },
+                DFAStateTag::Skip { .. } => q! { #_Ok(#_None) },
             },
         };
 
@@ -396,14 +423,14 @@ fn generate_state_methods<'a>(
 
         q! {
             impl #ident {
-                fn transition(c: char) -> Option<State> {
+                fn transition(c: #_char) -> #_Option<State> {
                     match c {
                         #(#transition_branches)*
-                        _ => None,
+                        _ => #_None,
                     }
                 }
 
-                fn accept(inp: &str, current_char: char) -> Result<Option<Token>, Error> {
+                fn accept(inp: &#_str, current_char: #_char) -> #_Result<#_Option<Token>, Error> {
                     #accept
                 }
             }
@@ -412,21 +439,28 @@ fn generate_state_methods<'a>(
 }
 
 fn generate_tokenize_fn() -> proc_macro2::TokenStream {
+    let _str = Core::Str.path();
+    let _Result = Std::Result.path();
+    let _Ok = Std::Ok.path();
+    let _Some = Std::Some.path();
+    let _Vec = Std::Vec.path();
+    let _None = Std::None.path();
+
     q! {
-        pub fn tokenize(inp: &str) -> Result<Vec<Token>, Error> {
-            let mut toks = Vec::new();
+        pub fn tokenize(inp: &#_str) -> #_Result<#_Vec<Token>, Error> {
+            let mut toks = #_Vec::new();
             let mut state = State::_1;
             let mut match_start = 0;
             let mut iter = inp.chars().enumerate().peekable();
 
-            while let Some((current_index, c)) = iter.peek() {
+            while let #_Some((current_index, c)) = iter.peek() {
                 match state.transition(*c) {
-                    Some(new_state) => {
+                    #_Some(new_state) => {
                         state = new_state;
                         iter.next();
                     }
-                    None => {
-                        if let Some(tok) = state.accept(&inp[match_start..*current_index], *c)? {
+                    #_None => {
+                        if let #_Some(tok) = state.accept(&inp[match_start..*current_index], *c)? {
                             toks.push(tok)
                         }
                         state = State::_1;
@@ -436,12 +470,12 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
             }
 
             if inp.len() > 0 {
-                if let Some(tok) = state.accept(&inp[match_start..], inp.chars().last().unwrap())? {
+                if let #_Some(tok) = state.accept(&inp[match_start..], inp.chars().last().unwrap())? {
                     toks.push(tok)
                 }
             }
 
-            Ok(toks)
+            #_Ok(toks)
         }
     }
 }

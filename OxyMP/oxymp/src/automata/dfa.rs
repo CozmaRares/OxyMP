@@ -32,6 +32,10 @@ pub struct DFA {
     states: HashMap<usize, State>,
 }
 
+// FIX: current implementation is slow
+// handle alphabet with many letters
+// *if regex has wildcards, it is slow
+// best handled with ranges
 pub fn compile(nfa: nfa::NFA) -> DFA {
     let alphabet = compute_alphabet(&nfa);
     let mut builder = DFABuilder::new(&nfa);

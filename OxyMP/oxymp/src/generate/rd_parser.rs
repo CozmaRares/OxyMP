@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
@@ -6,6 +8,7 @@ use crate::{
     data::{rd_parser::RDParserData, tokens::TokensData},
     grammar::{parse_grammar, GrammarNode, GrammarRule},
     idents,
+    symbols::*,
     utils::FoldErrors,
 };
 
@@ -32,16 +35,25 @@ fn generate_one(
 
     let tokens_ident = &tokens_data.ident;
 
+    let _Rc = Std::Rc.path();
+    let _usize = Core::Usize.path();
+    let _From = Trait::From.path();
+    let _Vec = Std::Vec.path();
+    let _Option = Std::Option.path();
+    let _Result = Std::Result.path();
+    let _Debug = Derive::Debug.path();
+    let _Clone = Derive::Clone.path();
+
     let parser_items = items! {
         type Token = super::#tokens_ident;
 
-        #[derive(Debug, Clone)]
+        #[derive(#_Debug, #_Clone)]
         pub struct ParserInput {
-            inp: ::std::rc::Rc<[Token]>,
-            cursor: ::core::primitive::usize,
+            inp: #_Rc<[Token]>,
+            cursor: #_usize,
         }
-        impl From<Vec<Token>> for ParserInput {
-            fn from(value: Vec<Token>) -> Self {
+        impl #_From<#_Vec<Token>> for ParserInput {
+            fn from(value: #_Vec<Token>) -> Self {
                 Self {
                     inp: value.into(),
                     cursor: 0,
@@ -49,7 +61,7 @@ fn generate_one(
             }
         }
         impl ParserInput {
-            fn peek(&self) -> Option<&Token> {
+            fn peek(&self) -> #_Option<&Token> {
                 self.inp.get(self.cursor)
             }
 
@@ -63,7 +75,7 @@ fn generate_one(
 
         // TODO:
         pub type ParserError = ();
-        pub type ParserState<T> = Result<(ParserInput, T), ParserError>;
+        pub type ParserState<T> = #_Result<(ParserInput, T), ParserError>;
 
         #ast
         #parser
@@ -75,6 +87,8 @@ fn generate_one(
 }
 
 fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStream {
+    let _Debug = Derive::Debug.path();
+
     let structs = rules.iter().map(|GrammarRule { name, node }| {
         let ASTNode {
             main_struct,
@@ -90,7 +104,7 @@ fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStr
 
         q! {
             #external_choices
-            #[derive(Debug)]
+            #[derive(#_Debug)]
             pub struct #rule_ident {
                 value: #main_struct
             }
@@ -123,11 +137,15 @@ struct ASTNode {
 }
 
 fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Ident) -> ASTNode {
+    let _Box = Std::Box.path();
+    let _Option = Std::Option.path();
+    let _Debug = Derive::Debug.path();
+
     match &node {
         GrammarNode::Rule(rule) => {
             let ident = idents::parser_rule(rule);
             ASTNode {
-                main_struct: q! {::std::boxed::Box<#ident>},
+                main_struct: q! { #_Box<#ident> },
                 external_choices: None,
             }
         }
@@ -169,7 +187,7 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
                 defs.filter_map(|d| d.external_choices).flatten().collect();
             let enum_ident = idents::choice_enum(name, *choice_idx);
             external_choices.push(q! {
-                #[derive(Debug)]
+                #[derive(#_Debug)]
                 pub enum #enum_ident {
                     #(#enum_entries),*
                 }
@@ -184,7 +202,7 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
             let generated = generate_ast_node(name, opt, tokens_ident);
             let main_struct = generated.main_struct;
             ASTNode {
-                main_struct: q! { ::std::option::Option<#main_struct> },
+                main_struct: q! { #_Option<#main_struct> },
                 external_choices: generated.external_choices,
             }
         }
@@ -213,10 +231,12 @@ fn generate_method(
 
     let rule_ident = idents::parser_rule(name);
 
+    let _Ok = Std::Ok.path();
+
     q! {
         pub fn #rule_ident<'a>(inp: ParserInput) -> ParserState<#rule_ident> {
             #toks
-            Ok((
+            #_Ok((
                 inp,
                 #rule_ident { value: #ident }
             ))
@@ -234,6 +254,12 @@ fn expand_node(
 ) -> (TokenStream, proc_macro2::Ident) {
     let node_ident = idents::numeric(node_idx);
 
+    let _Box = Std::Box.path();
+    let _Some = Std::Some.path();
+    let _None = Std::None.path();
+    let _Err = Std::Err.path();
+    let _Ok = Std::Ok.path();
+
     let toks = match &node {
         GrammarNode::Rule(nested_rule) => {
             let rule_ident = idents::parser_rule(nested_rule);
@@ -245,19 +271,19 @@ fn expand_node(
                 //#check
                 let (inp, #node_ident) =
                     #rule_ident(inp)
-                        .map(|(remaining, ast)| (remaining, Box::new(ast)))?;
+                        .map(|(remaining, ast)| (remaining, #_Box::new(ast)))?;
             }
         }
         GrammarNode::Token(token) => {
             let token_struct_entry = idents::token_struct(tokens_ident, token);
 
             q! {
-                let Some(_current) = inp.peek() else {
-                return Err(()); // TODO: EOI
+                let #_Some(_current) = inp.peek() else {
+                return #_Err(()); // TODO: EOI
                 };
                 let (inp, #node_ident) = match super::#token_struct_entry::try_from_ref(_current) {
-                    None => return Err(()), // TODO: Unexpected
-                    Some(t) => (inp.advance(), t),
+                    #_None => return #_Err(()), // TODO: Unexpected
+                    #_Some(t) => (inp.advance(), t),
                 };
             }
         }
@@ -277,7 +303,7 @@ fn expand_node(
                 let (inp, #node_ident) = (|| {
                      #(#toks)*
 
-                    Ok((
+                    #_Ok((
                         inp,
                         ( #(#idents),* )
                     ))
@@ -302,10 +328,10 @@ fn expand_node(
                         let r: ParserState<_> = (|| {
                             let inp = inp.clone();
                             #toks
-                            Ok((inp, #ident))
+                            #_Ok((inp, #ident))
                         })();
-                        if let Ok((inp, ast)) = r {
-                            return Ok((inp, #choice_ident::#idx_ident(ast)));
+                        if let #_Ok((inp, ast)) = r {
+                            return #_Ok((inp, #choice_ident::#idx_ident(ast)));
                         };
                     }
                 });
@@ -318,7 +344,7 @@ fn expand_node(
                 let (inp, #node_ident) =  (|| {
                     #(#defs)*
 
-                    Err(()) // All choices failed
+                    #_Err(()) // All choices failed
                 })()?;
             }
         }
@@ -333,11 +359,11 @@ fn expand_node(
                     //#check
                     let inp = inp.clone();
                     #toks
-                    Ok((inp, #ident))
+                    #_Ok((inp, #ident))
                 })();
                 let (inp, #node_ident) =  match res {
-                    Ok((new_inp, ast)) => (new_inp, Some(ast)),
-                    Err(_) => (inp, None),
+                    #_Ok((new_inp, ast)) => (new_inp, #_Some(ast)),
+                    #_Err(_) => (inp, #_None),
                 };
             }
         }
