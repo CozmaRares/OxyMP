@@ -1,12 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::range::{Range, Ranges};
+
 use super::nfa;
 
 #[derive(Debug, Clone)]
-pub enum Transition {
-    Char(char),
-    Chars { start: char, end: char },
-}
+pub struct Transition(pub Range);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StateTag {
@@ -32,10 +31,7 @@ pub struct DFA {
     states: HashMap<usize, State>,
 }
 
-// FIX: current implementation is slow
-// handle alphabet with many letters
-// *if regex has wildcards, it is slow
-// best handled with ranges
+// FIX: DFA can't compile properly after refactoring to ranges
 pub fn compile(nfa: nfa::NFA) -> DFA {
     let alphabet = compute_alphabet(&nfa);
     let mut builder = DFABuilder::new(&nfa);
@@ -53,9 +49,10 @@ pub fn compile(nfa: nfa::NFA) -> DFA {
             .nfa_equivalent_states
             .clone();
 
-        for letter in &alphabet {
+        for range in &alphabet {
             let nfa_next_states =
-                nfa.simulate_transition(&dfa_state_nfa_equivalent_states, *letter);
+                simulate_transition(&nfa, &dfa_state_nfa_equivalent_states, range);
+
             let nfa_next_states = nfa.compute_epsilon_closure(nfa_next_states);
 
             if nfa_next_states.is_empty() {
@@ -67,7 +64,7 @@ pub fn compile(nfa: nfa::NFA) -> DFA {
                 Some(id) => id,
             };
 
-            builder.add_transition(state_id, next_state_id, Transition::Char(*letter));
+            builder.add_transition(state_id, next_state_id, range.clone());
         }
     }
 
@@ -77,7 +74,7 @@ pub fn compile(nfa: nfa::NFA) -> DFA {
 }
 
 // TODO:
-pub fn minimize(dfa: DFA) -> DFA {
+fn minimize(dfa: DFA) -> DFA {
     dfa
 }
 
@@ -87,68 +84,19 @@ fn compress_char_classes(mut dfa: DFA) -> DFA {
         .into_iter()
         .map(|(id, mut state)| {
             // group transitions by target state
-            let mut transitions: HashMap<usize, Vec<char>> = HashMap::new();
+            let mut transitions: HashMap<usize, Vec<Range>> = HashMap::new();
 
-            for (transition, target) in &state.transitions {
-                match transition {
-                    Transition::Char(c) => {
-                        transitions.entry(*target).or_default().extend([*c]);
-                    }
-                    Transition::Chars { start, end } => {
-                        for c in *start..=*end {
-                            transitions.entry(*target).or_default().extend([c]);
-                        }
-                    }
-                }
+            for (Transition(range), target) in state.transitions {
+                transitions.entry(target).or_default().push(range);
             }
 
-            transitions.iter_mut().for_each(|(_, chars)| chars.sort());
-
-            let mut compressed_transitions: HashMap<usize, Vec<Transition>> = HashMap::new();
-
-            for (target, chars) in transitions {
-                let mut chars = chars.iter().peekable();
-                let mut compressed_transitions_vec = Vec::new();
-
-                while let Some(current_char) = chars.next() {
-                    match chars.peek() {
-                        Some(next_char) => {
-                            if (*current_char as u64) + 1 == **next_char as u64 {
-                                let start_char = *current_char;
-                                let mut end_char = *current_char;
-
-                                while let Some(lookahead_char) = chars.peek() {
-                                    if (end_char as u64) + 1 == **lookahead_char as u64 {
-                                        end_char = **lookahead_char;
-                                        chars.next();
-                                    } else {
-                                        break;
-                                    }
-                                }
-
-                                compressed_transitions_vec.push(Transition::Chars {
-                                    start: start_char,
-                                    end: end_char,
-                                });
-                            } else {
-                                compressed_transitions_vec.push(Transition::Char(*current_char));
-                            }
-                        }
-                        None => {
-                            compressed_transitions_vec.push(Transition::Char(*current_char));
-                        }
-                    }
-                }
-
-                compressed_transitions.insert(target, compressed_transitions_vec);
-            }
-
-            state.transitions = compressed_transitions
+            state.transitions = transitions
                 .into_iter()
-                .flat_map(|(target, transitions)| {
-                    transitions
+                .flat_map(|(target, ranges)| {
+                    ranges
+                        .aggregate_ranges()
                         .into_iter()
-                        .map(move |transition| (transition, target))
+                        .map(move |range| (Transition(range), target))
                 })
                 .collect();
 
@@ -159,26 +107,27 @@ fn compress_char_classes(mut dfa: DFA) -> DFA {
     dfa
 }
 
-fn compute_alphabet(nfa: &nfa::NFA) -> HashSet<char> {
-    let mut alphabet = HashSet::new();
+fn compute_alphabet(nfa: &nfa::NFA) -> Vec<Range> {
+    nfa.states()
+        .values()
+        .flat_map(|state| &state.transitions)
+        .filter_map(|(transition, _)| match transition {
+            nfa::Transition::Range(range) => Some(range.clone()),
+            _ => None,
+        })
+        .split_ranges()
+}
 
-    for state in nfa.states().values() {
-        for (transition, _) in &state.transitions {
-            match transition {
-                nfa::Transition::Char(c) => {
-                    alphabet.insert(*c);
-                }
-                nfa::Transition::Chars { start, end } => {
-                    for c in *start..=*end {
-                        alphabet.insert(c);
-                    }
-                }
-                nfa::Transition::Epsilon => {}
-            }
-        }
+impl From<char> for Transition {
+    fn from(c: char) -> Self {
+        Transition(c.into())
     }
+}
 
-    alphabet
+impl From<(char, char)> for Transition {
+    fn from(tuple: (char, char)) -> Self {
+        Transition(tuple.into())
+    }
 }
 
 impl TryFrom<nfa::StateTag> for StateTag {
@@ -375,9 +324,9 @@ impl<'a> DFABuilder<'a> {
         id
     }
 
-    fn add_transition(&mut self, from: usize, to: usize, transition: Transition) {
+    fn add_transition(&mut self, from: usize, to: usize, range: Range) {
         if let Some(state) = self.states.get_mut(&from) {
-            state.add_transition(transition, to);
+            state.add_transition(Transition(range), to);
         }
     }
 
@@ -404,3 +353,33 @@ impl<'a> DFABuilder<'a> {
         dfa
     }
 }
+
+fn simulate_transition<'a, I: IntoIterator<Item = &'a usize>>(
+    nfa: &nfa::NFA,
+    starting_state_ids: I,
+    range: &Range,
+) -> HashSet<usize> {
+    let mut state_ids = HashSet::new();
+
+    for state_id in starting_state_ids {
+        let state = nfa.states().get(state_id).expect("state not found");
+
+        for (transition, next_state_id) in &state.transitions {
+            match transition {
+                nfa::Transition::Range(transition_range) => {
+                    if transition_range.contains_range(range) {
+                        state_ids.insert(*next_state_id);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    state_ids
+}
+
+// TODO:
+// #[cfg(test)]
+// mod tests {
+// }

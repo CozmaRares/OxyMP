@@ -24,7 +24,7 @@ macro_rules! pq {
                         line!(),
                     );
                     let msg = crate::macros::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
-                    panic!("{}", msg);
+                    std::panic!("{}", msg);
                 }
             }
         }
@@ -49,7 +49,25 @@ macro_rules! assert {
     ($cond:expr, $($args:tt)*) => {
         if !$cond {
             eprintln!("Assertion failed at {}:{}", file!(), line!());
-            panic!($($args)*);
+            std::panic!($($args)*);
         }
+    };
+}
+
+#[allow(unused_macros)]
+#[cfg(debug_assertions)]
+macro_rules! time {
+    ($str:expr, $($tt:tt)*) => {
+        {
+            let start = std::time::Instant::now();
+            let r = {
+                $($tt)*
+            };
+            let end = std::time::Instant::now();
+            let duration = end.duration_since(start);
+            println!("{} took {} milliseconds", $str, duration.as_millis());
+            r
+        }
+
     };
 }

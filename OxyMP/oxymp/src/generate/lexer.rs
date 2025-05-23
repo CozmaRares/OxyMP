@@ -16,6 +16,7 @@ use crate::{
         lexer::LexerData,
         tokens::{TokenPattern, TokensData},
     },
+    range::Range,
     symbols::*,
     utils::FoldErrors,
 };
@@ -261,7 +262,9 @@ fn generate_lexer_dfa(
     nfas.push(token_nfa.clone());
 
     let nfa = nfa::combine(nfas);
+    eprintln!("{:?}", nfa);
     let dfa = dfa::compile(nfa);
+    eprintln!("{:?}", dfa);
     Ok(dfa)
 }
 
@@ -376,28 +379,32 @@ fn generate_state_methods<'a>(
     let _Result = Std::Result.path();
 
     dfa.states().iter().map(move |(state_id, state)| {
-        let transition_branches = state.transitions.iter().map(|(transition, target)| {
-            let target = format_ident!("_{}", target);
-            let target = q! { #_Some(State::#target) };
-            match transition {
-                DFATransition::Char(c) => q! { #c => #target, },
-                DFATransition::Chars { start, end } => q! { #start..=#end => #target, },
-            }
-        });
+        let transition_branches = state
+            .transitions
+            .iter()
+            .map(|(DFATransition(range), target)| {
+                let target = format_ident!("_{}", target);
+                let target = q! { #_Some(State::#target) };
+                match range {
+                    Range::One(c) => q! { #c => #target, },
+                    Range::Multi { start, end } => q! { #start..=#end => #target, },
+                }
+            });
 
         let accept = match &state.kind {
             DFAStateKind::NotAccepting => {
-                let expected = state
-                    .transitions
-                    .iter()
-                    .map(|(transition, _)| match transition {
-                        DFATransition::Char(c) => q! {
-                            LexerExpected::Char(#c)
-                        },
-                        DFATransition::Chars { start, end } => q! {
-                            LexerExpected::CharRange{ start: #start, end: #end }
-                        },
-                    });
+                let expected =
+                    state
+                        .transitions
+                        .iter()
+                        .map(|(DFATransition(range), _)| match range {
+                            Range::One(c) => q! {
+                                LexerExpected::Char(#c)
+                            },
+                            Range::Multi { start, end } => q! {
+                                LexerExpected::CharRange{ start: #start, end: #end }
+                            },
+                        });
 
                 q! {
                     #_Err(

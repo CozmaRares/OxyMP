@@ -69,3 +69,53 @@ pub fn multiple_attribute_error(
         })
         .collect_errors()
 }
+
+pub trait CharHelper {
+    fn next_char(&self) -> Option<char>;
+    fn prev_char(&self) -> Option<char>;
+
+    fn is_followed_by(&self, other: &Self) -> bool;
+    fn is_preceded_by(&self, other: &Self) -> bool {
+        other.is_followed_by(self)
+    }
+}
+
+const MIN_CODEPOINT: u32 = 0;
+const LOW_SURROGATE_END: u32 = 0xD7FF;
+const HIGH_SURROGATE_START: u32 = 0xE000;
+const MAX_CODEPOINT: u32 = 0x10FFFF;
+
+// TEST: test this
+impl CharHelper for char {
+    fn next_char(&self) -> Option<char> {
+        let mut code = *self as u32;
+        if code == MAX_CODEPOINT {
+            return None;
+        }
+        code += 1;
+
+        if code > LOW_SURROGATE_END && code < HIGH_SURROGATE_START {
+            code = HIGH_SURROGATE_START;
+        }
+        char::from_u32(code)
+    }
+
+    fn prev_char(&self) -> Option<char> {
+        let mut code = *self as u32;
+        if code == MIN_CODEPOINT {
+            return None;
+        }
+        code -= 1;
+
+        if code > LOW_SURROGATE_END && code < HIGH_SURROGATE_START {
+            code = LOW_SURROGATE_END;
+        }
+        char::from_u32(code)
+    }
+
+    fn is_followed_by(&self, other: &Self) -> bool {
+        self.next_char()
+            .map(|next_char| next_char == *other)
+            .unwrap_or(false)
+    }
+}

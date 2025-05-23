@@ -16,6 +16,7 @@ mod grammar;
 mod idents;
 mod utils;
 mod symbols;
+mod range;
 
 use data::process_module;
 use generate::generate;

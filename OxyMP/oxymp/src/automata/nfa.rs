@@ -7,7 +7,7 @@ use regex_syntax::{
     parse,
 };
 
-use crate::utils::capitalize;
+use crate::{range::Range, utils::capitalize};
 
 // TODO: report common regexes that are not supported
 #[derive(Debug, thiserror::Error)]
@@ -35,8 +35,7 @@ pub enum NFACompileError {
 #[derive(Debug, Clone)]
 pub enum Transition {
     Epsilon,
-    Char(char),
-    Chars { start: char, end: char },
+    Range(Range),
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +47,7 @@ pub enum StateKind {
 
 #[derive(Debug, Clone)]
 pub enum StateTag {
+    // TODO: remove pattern
     Skip { pattern: String },
     Token { variant: String, priority: usize },
     None,
@@ -266,32 +266,6 @@ impl NFA {
 
         state_ids
     }
-
-    pub fn simulate_transition<'a, I: IntoIterator<Item = &'a usize>>(
-        &self,
-        starting_state_ids: I,
-        letter: char,
-    ) -> HashSet<usize> {
-        let mut state_ids = HashSet::new();
-
-        for state_id in starting_state_ids {
-            let state = self.states.get(state_id).expect("state not found");
-
-            for (transition, next_state_id) in &state.transitions {
-                match transition {
-                    Transition::Char(c) if *c == letter => {
-                        state_ids.insert(*next_state_id);
-                    }
-                    Transition::Chars { start, end } if *start <= letter && letter <= *end => {
-                        state_ids.insert(*next_state_id);
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        state_ids
-    }
 }
 
 impl std::fmt::Debug for NFA {
@@ -425,7 +399,7 @@ fn visit_literal(literal: &Literal) -> NFA {
         };
 
         let id = builder.create_state(kind);
-        builder.add_transition(parent_id, id, Transition::Char(c));
+        builder.add_transition(parent_id, id, Transition::Range(c.into()));
         parent_id = id;
     }
 
@@ -444,11 +418,11 @@ fn visit_class(class: &ClassUnicode) -> NFA {
         builder.add_transition(
             builder.start_state(),
             state,
-            if start == end {
-                Transition::Char(start)
+            Transition::Range(if start == end {
+                start.into()
             } else {
-                Transition::Chars { start, end }
-            },
+                (start, end).into()
+            }),
         );
     }
 
@@ -553,3 +527,9 @@ fn visit_alternation(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
 
     Ok(builder.build())
 }
+
+
+// TODO:
+// #[cfg(test)]
+// mod tests {
+// }

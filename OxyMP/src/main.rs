@@ -51,9 +51,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tokens = lexer::tokenize(input)?;
     let ast = rd_parser::E(tokens.clone().into()).unwrap().1;
 
-    // println!("{:#?}", input);
-    // println!("{:#?}", tokens);
-    // println!("{:#?}", ast);
+    println!("{:#?}", input);
+    println!("{:#?}", tokens);
+    println!("{:#?}", ast);
     println!("{}", ast.visit());
 
     Ok(())
