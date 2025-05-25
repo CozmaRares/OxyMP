@@ -23,7 +23,9 @@ macro_rules! pq {
                         file!(),
                         line!(),
                     );
-                    let msg = crate::macros::extract_panic_message(&e).unwrap_or_else(|| "Panic occurred, but message could not be retrieved.".to_string());
+                    let msg = crate::macros::extract_panic_message(&e).unwrap_or_else(
+                        || "Panic occurred, but message could not be retrieved.".to_string()
+                    );
                     std::panic!("{}", msg);
                 }
             }

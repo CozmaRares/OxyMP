@@ -32,13 +32,13 @@ impl From<(char, char)> for Range {
 impl Range {
     pub fn contains_char(&self, c: &char) -> bool {
         match self {
-            Range::One(c1) => c == c1,
-            Range::Multi { start, end } => c >= start && c <= end,
+            Range::One(this_c) => this_c == c,
+            Range::Multi { start, end } => start <= c && c <= end,
         }
     }
 
     pub fn contains_range(&self, other: &Range) -> bool {
-        match (other, self) {
+        match (self, other) {
             (Range::One(_), Range::Multi { .. }) => false,
             (_, Range::One(other_char)) => self.contains_char(other_char),
             (
@@ -82,7 +82,7 @@ impl<Iter: IntoIterator<Item = Range>> Ranges for Iter {
     fn aggregate_ranges(self) -> Vec<Range> {
         let mut events = compute_events(self);
         events = remove_nested_events(events);
-        let mut ranges = make_ranges(events);
+        let ranges = make_ranges(events);
         combine_adjacent_ranges(ranges)
     }
 }
