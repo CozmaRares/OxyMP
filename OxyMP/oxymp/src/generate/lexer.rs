@@ -125,6 +125,7 @@ fn generate_error_ds() -> ErrorItem {
     let _format = Macro::Format.path();
     let _writeln = Macro::Writeln.path();
     let _Debug = Derive::Debug.path();
+    let _String = Std::String.path();
 
     let items = items! {
         #[derive(#_Debug)]
@@ -140,7 +141,7 @@ fn generate_error_ds() -> ErrorItem {
                         #_write!(f, "whitespace(code {})", *c as #_usize)
                     }
                     else {
-                        #_write!(f, "'{}", c)
+                        #_write!(f, "'{}'", c)
                     }
                 };
 
@@ -160,6 +161,8 @@ fn generate_error_ds() -> ErrorItem {
             Native {
                 unexpected_char: #_char,
                 expected: #_Vec<#LexerExpected>,
+                source: #_String,
+                offset: #_usize,
             },
             UserTransform(T),
         }
@@ -171,6 +174,8 @@ fn generate_error_ds() -> ErrorItem {
                     #LexerError::Native {
                         unexpected_char,
                         expected,
+                        source,
+                        offset,
                     } => {
                         let expected = expected
                             .iter()
@@ -181,7 +186,14 @@ fn generate_error_ds() -> ErrorItem {
                             f,
                             "Unexpected character '{}'\nExpected: {}",
                             unexpected_char, expected
-                        )
+                        );
+
+                        // FIX: will not work for multi-column width characters
+                        #_writeln!(f, "{}", source)?;
+                        for _ in 0..*offset {
+                            #_write!(f, " ")?;
+                        }
+                        #_writeln!(f, "^ --- here")
                     }
                     #LexerError::UserTransform(e) => #_writeln!(f, "User transform error: {}", e),
                 }
@@ -262,9 +274,7 @@ fn generate_lexer_dfa(
     nfas.push(token_nfa.clone());
 
     let nfa = nfa::combine(nfas);
-    eprintln!("{:?}", nfa);
     let dfa = dfa::compile(nfa);
-    eprintln!("{:?}", dfa);
     Ok(dfa)
 }
 
@@ -289,8 +299,7 @@ fn generate_mod(
                 TokenPattern::Exact { .. } => q! { Token::#variant_ident },
                 TokenPattern::Regex { transform, .. } => q! {
                     super::#transform(inp)
-                        .map(Token::#variant_ident)
-                        .map_err(Error::UserTransform)?
+                        .map(Token::#variant_ident)?
                 },
             };
 
@@ -309,7 +318,8 @@ fn generate_mod(
 
     let items = items! {
         type Token = super::#tokens_ident;
-        pub type Error = super::#error_ident<super::#user_error_ident>;
+        type UserError = super::#user_error_ident;
+        pub type Error = super::#error_ident<UserError>;
         pub type LexerExpected = super::#expected_ident;
 
         #states
@@ -317,6 +327,18 @@ fn generate_mod(
         #tokenize_fn
     };
     Ok(items)
+}
+
+fn generate_match_branches<'a>(
+    idents: &'a [syn::Ident],
+    method: &str,
+    args: &'a [&str],
+) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
+    let method = format_ident!("{}", method);
+    idents.iter().map(move |ident| {
+        let args = args.into_iter().map(|arg| format_ident!("{}", arg));
+        q! { State::#ident => #ident::#method(#(#args),*), }
+    })
 }
 
 fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
@@ -327,26 +349,27 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
         .collect();
 
     let state_structs = idents.iter().map(|ident| q! { struct #ident; });
-    let transition_branches = idents
-        .iter()
-        .map(|ident| q! { State::#ident => #ident::transition(c), });
-    let accept_branches = idents
-        .iter()
-        .map(|ident| q! { State::#ident => #ident::accept(inp, c), });
+
+    let transition_branches = generate_match_branches(&idents, "transition", &["c"]);
+    let is_accepting_branches = generate_match_branches(&idents, "is_accepting", &[]);
+    let accept_branches = generate_match_branches(&idents, "accept", &["inp"]);
+    let reject_branches = generate_match_branches(&idents, "reject", &["inp", "c", "offset"]);
 
     let _Option = Std::Option.path();
     let _char = Core::Char.path();
     let _str = Core::Str.path();
     let _Result = Std::Result.path();
     let _Debug = Derive::Debug.path();
+    let _usize = Core::Usize.path();
+    let _Clone = Derive::Clone.path();
 
     q! {
-        #[derive(#_Debug)]
+        #(#state_structs)*
+
+        #[derive(#_Debug, #_Clone)]
         enum State {
             #(#idents),*
         }
-
-        #(#state_structs)*
 
         impl State {
             fn transition(&self, c: #_char) -> #_Option<State> {
@@ -355,9 +378,21 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
                 }
             }
 
-            fn accept(&self, inp: &#_str, c: #_char) -> #_Result<#_Option<Token>, Error> {
+            fn is_accepting(&self) -> bool {
+                match self {
+                    #(#is_accepting_branches)*
+                }
+            }
+
+            fn accept(&self, inp: &#_str) -> Result<#_Option<Token>, UserError> {
                 match self {
                     #(#accept_branches)*
+                }
+            }
+
+            fn reject(&self, inp: &#_str, c: #_char, offset: #_usize) -> Error {
+                match self {
+                    #(#reject_branches)*
                 }
             }
         }
@@ -377,6 +412,9 @@ fn generate_state_methods<'a>(
     let _Option = Std::Option.path();
     let _str = Core::Str.path();
     let _Result = Std::Result.path();
+    let _unreachable = Macro::Unreachable.path();
+    let _String = Std::String.path();
+    let _usize = Core::Usize.path();
 
     dfa.states().iter().map(move |(state_id, state)| {
         let transition_branches = state
@@ -391,7 +429,26 @@ fn generate_state_methods<'a>(
                 }
             });
 
-        let accept = match &state.kind {
+        let is_accepting_impl = match &state.kind {
+            DFAStateKind::NotAccepting => q! { false },
+            DFAStateKind::Accepting(_) => q! { true },
+        };
+
+        let accept_impl = match &state.kind {
+            DFAStateKind::NotAccepting => q! { #_unreachable!("The 'accept' method should not be called on a DFA state that is not accepting. This is most likely a bug in the lexer.") },
+            DFAStateKind::Accepting(tag) => match tag {
+                DFAStateTag::Token { variant, .. } => {
+                    let transform = token_transforms
+                        .get(variant)
+                        .expect("token pattern should always have an transform");
+                    q! { #_Ok(#_Some(#transform)) }
+                }
+                DFAStateTag::Skip { .. } => q! { #_Ok(#_None) },
+            }
+        };
+
+        let reject_impl = match &state.kind {
+            DFAStateKind::Accepting(..) => q! { #_unreachable!("The 'reject' method should not be called on a DFA state that is accepting. This is most likely a bug in the lexer.") },
             DFAStateKind::NotAccepting => {
                 let expected =
                     state
@@ -406,24 +463,16 @@ fn generate_state_methods<'a>(
                             },
                         });
 
+                // TODO: select just the last part of the input
                 q! {
-                    #_Err(
-                        Error::Native {
-                            unexpected_char: current_char,
-                            expected: #_vec![ #(#expected),* ]
-                        }
-                    )
+                    Error::Native {
+                        unexpected_char: c,
+                        expected: #_vec![ #(#expected),* ],
+                        source: #_String::from(inp),
+                        offset,
+                    }
                 }
             }
-            DFAStateKind::Accepting(tag) => match tag {
-                DFAStateTag::Token { variant, .. } => {
-                    let transform = token_transforms
-                        .get(variant)
-                        .expect("token pattern should always have an transform");
-                    q! { #_Ok(#_Some(#transform)) }
-                }
-                DFAStateTag::Skip { .. } => q! { #_Ok(#_None) },
-            },
         };
 
         let ident = format_ident!("_{}", state_id);
@@ -437,8 +486,16 @@ fn generate_state_methods<'a>(
                     }
                 }
 
-                fn accept(inp: &#_str, current_char: #_char) -> #_Result<#_Option<Token>, Error> {
-                    #accept
+                fn is_accepting() -> bool {
+                    #is_accepting_impl
+                }
+
+                fn accept(inp: &#_str) -> #_Result<#_Option<Token>, UserError> {
+                    #accept_impl
+                }
+
+                fn reject(inp: &#_str, c: #_char, offset: #_usize) -> Error {
+                    #reject_impl
                 }
             }
         }
@@ -452,6 +509,7 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
     let _Some = Std::Some.path();
     let _Vec = Std::Vec.path();
     let _None = Std::None.path();
+    let _Err = Std::Err.path();
 
     q! {
         pub fn tokenize(inp: &#_str) -> #_Result<#_Vec<Token>, Error> {
@@ -460,25 +518,57 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
             let mut match_start = 0;
             let mut iter = inp.chars().enumerate().peekable();
 
-            while let #_Some((current_index, c)) = iter.peek() {
-                match state.transition(*c) {
-                    #_Some(new_state) => {
-                        state = new_state;
+            while iter.peek().is_some() {
+                let mut last_accepting_state = #_None;
+                let mut last_accepting_pos = match_start;
+                let mut temp_state = state.clone();
+                let mut temp_pos = iter.peek().map(|(pos, _)| *pos).unwrap_or(inp.len());
+
+                let mut temp_iter = iter.clone();
+                while let #_Some((pos, ch)) = temp_iter.peek() {
+                    if let #_Some(new_state) = temp_state.transition(*ch) {
+                        temp_state = new_state;
+                        temp_pos = *pos + 1;
+
+                        if temp_state.is_accepting() {
+                            last_accepting_state = #_Some(temp_state.clone());
+                            last_accepting_pos = temp_pos;
+                        }
+
+                        temp_iter.next();
+                    } else {
+                        break;
+                    }
+                }
+
+                if let #_Some(accepting_state) = last_accepting_state {
+                    while iter.peek().map(|(pos, _)| *pos).unwrap_or(inp.len()) < last_accepting_pos
+                    {
                         iter.next();
                     }
-                    #_None => {
-                        if let #_Some(tok) = state.accept(&inp[match_start..*current_index], *c)? {
-                            toks.push(tok)
-                        }
-                        state = State::_1;
-                        match_start = *current_index;
+
+                    if let #_Some(tok) = accepting_state
+                        .accept(&inp[match_start..last_accepting_pos])
+                        .map_err(Error::UserTransform)?
+                    {
+                        toks.push(tok);
                     }
+
+                    state = State::_1;
+                    match_start = last_accepting_pos;
+                } else {
+                    let (pos, ch) = iter.peek().expect("was previously checked to be Some");
+                    // TODO: get last line of input & a slice where the error is
+                    return #_Err(state.reject(&inp, *ch, *pos));
                 }
             }
 
-            if inp.len() > 0 {
-                if let #_Some(tok) = state.accept(&inp[match_start..], inp.chars().last().unwrap())? {
-                    toks.push(tok)
+            if match_start < inp.len() {
+                if let #_Some(tok) = state
+                    .accept(&inp[match_start..])
+                    .map_err(Error::UserTransform)?
+                {
+                    toks.push(tok);
                 }
             }
 

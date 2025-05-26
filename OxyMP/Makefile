@@ -24,6 +24,9 @@ expand:
 count:
 	@cd oxymp/src && cloc .
 
+fmt:
+	@cd oxymp && cargo fmt
+
 clean:
 	@cargo clean
 	@cd oxymp && cargo clean

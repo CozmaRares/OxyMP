@@ -14,11 +14,13 @@ enum All {
     StdBox,
     StdFormatter,
     StdFmtResult,
+    StdString,
 
     MacroVec,
     MacroWrite,
     MacroWriteln,
     MacroFormat,
+    MacroUnreachable,
 
     TraitDisplay,
     TraitError,
@@ -46,11 +48,13 @@ impl All {
             All::StdBox => q! { ::std::boxed::Box },
             All::StdFormatter => q! { ::std::fmt::Formatter },
             All::StdFmtResult => q! { ::std::fmt::Result },
+            All::StdString => q! { ::std::string::String },
 
             All::MacroVec => q! { ::std::vec },
             All::MacroWrite => q! { ::std::write },
             All::MacroWriteln => q! { ::std::writeln },
             All::MacroFormat => q! { ::std::format },
+            All::MacroUnreachable => q! { ::std::unreachable },
 
             All::TraitDisplay => q! { ::std::fmt::Display },
             All::TraitError => q! { ::std::error::Error },
@@ -80,6 +84,7 @@ pub enum Std {
     Box,
     Formatter,
     FmtResult,
+    String,
 }
 
 pub enum Macro {
@@ -87,6 +92,7 @@ pub enum Macro {
     Write,
     Writeln,
     Format,
+    Unreachable,
 }
 
 pub enum Trait {
@@ -124,6 +130,7 @@ impl From<Std> for All {
             Std::Box => All::StdBox,
             Std::Formatter => All::StdFormatter,
             Std::FmtResult => All::StdFmtResult,
+            Std::String => All::StdString,
         }
     }
 }
@@ -135,6 +142,7 @@ impl From<Macro> for All {
             Macro::Write => All::MacroWrite,
             Macro::Writeln => All::MacroWriteln,
             Macro::Format => All::MacroFormat,
+            Macro::Unreachable => All::MacroUnreachable,
         }
     }
 }

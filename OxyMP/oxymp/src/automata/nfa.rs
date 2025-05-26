@@ -528,7 +528,6 @@ fn visit_alternation(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
     Ok(builder.build())
 }
 
-
 // TODO:
 // #[cfg(test)]
 // mod tests {
