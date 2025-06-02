@@ -31,4 +31,7 @@ clean:
 	@cargo clean
 	@cd oxymp && cargo clean
 
-.PHONY: all run trace check expand count
+doc:
+	@cd oxymp && cargo doc --open
+
+.PHONY: all run trace check update test expand count fmt clean doc
