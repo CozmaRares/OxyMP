@@ -55,4 +55,3 @@ macro_rules! oxymp_assert {
         }
     };
 }
-

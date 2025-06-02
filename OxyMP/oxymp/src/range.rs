@@ -206,14 +206,18 @@ fn assert_correct_events(events: &Vec<Event>) {
                 oxymp_assert!(
                     false,
                     "end event {}({}) on even index {}",
-                    event.value, event.value as u32, idx
+                    event.value,
+                    event.value as u32,
+                    idx
                 )
             }
             (false, EventType::Start) => {
                 oxymp_assert!(
                     false,
                     "start event {}({}) on odd index {}",
-                    event.value, event.value as u32, idx
+                    event.value,
+                    event.value as u32,
+                    idx
                 )
             }
         }
@@ -299,7 +303,8 @@ fn split_overlapping_events(events: Vec<Event>) -> Vec<Event> {
                 oxymp_assert!(
                     false,
                     "end event without start event {}({})",
-                    event.value, event.value as u32
+                    event.value,
+                    event.value as u32
                 )
             }
 
@@ -381,7 +386,8 @@ fn remove_nested_events(events: Vec<Event>) -> Vec<Event> {
                 oxymp_assert!(
                     false,
                     "end event without start event {}({})",
-                    event.value, event.value as u32
+                    event.value,
+                    event.value as u32
                 )
             }
 
@@ -438,6 +444,10 @@ fn are_adjacent(range1: &Range, range2: &Range) -> bool {
 }
 
 fn combine_adjacent_ranges(ranges: Vec<Range>) -> Vec<Range> {
+    if ranges.is_empty() {
+        return ranges;
+    }
+
     let mut output = Vec::new();
     let mut iter = ranges.into_iter();
     let mut current_range = iter.next().unwrap();
@@ -457,9 +467,242 @@ fn combine_adjacent_ranges(ranges: Vec<Range>) -> Vec<Range> {
     output
 }
 
-//
-// TODO:
-// #[cfg(test)]
-// mod tests {
-//  // test if after splitting, ranges still cover the same interval
-// }
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    fn ranges_to_char_set(ranges: &[Range]) -> HashSet<char> {
+        ranges
+            .iter()
+            .flat_map(|range| match range {
+                Range::One(c) => *c..=*c,
+                Range::Multi { start, end } => *start..=*end,
+            })
+            .collect()
+    }
+
+    fn assert_ranges_equivalent(a: &[Range], b: &[Range]) {
+        let hash_a = ranges_to_char_set(a);
+        let hash_b = ranges_to_char_set(b);
+        assert_eq!(hash_a, hash_b);
+    }
+
+    #[test]
+    fn test_split_ranges_empty() {
+        let input: Vec<Range> = vec![];
+        let result = input.split_ranges();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_split_ranges_one_char() {
+        let input = vec![Range::One('a')];
+        let expected = vec![Range::One('a')];
+        let result = input.split_ranges();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_split_ranges_multi_char() {
+        let input = vec![
+            Range::Multi {
+                start: 'a',
+                end: 'c',
+            },
+            Range::Multi {
+                start: 'b',
+                end: 'd',
+            },
+        ];
+        let expected = vec![
+            Range::One('a'),
+            Range::Multi {
+                start: 'b',
+                end: 'c',
+            },
+            Range::One('d'),
+        ];
+        let result = input.split_ranges();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_split_ranges_mixed() {
+        let input = vec![
+            Range::One('a'),
+            Range::Multi {
+                start: 'a',
+                end: 'g',
+            },
+            Range::One('e'),
+        ];
+        let expected = vec![
+            Range::One('a'),
+            Range::Multi {
+                start: 'b',
+                end: 'd',
+            },
+            Range::One('e'),
+            Range::Multi {
+                start: 'f',
+                end: 'g',
+            },
+        ];
+        let result = input.split_ranges();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_aggregate_ranges_empty() {
+        let input: Vec<Range> = vec![];
+        let result = input.aggregate_ranges();
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_aggregate_ranges_one_char() {
+        let input = vec![Range::One('a')];
+        let result = input.aggregate_ranges();
+        assert_eq!(result, vec![Range::One('a')]);
+    }
+
+    #[test]
+    fn test_aggregate_ranges_consecutive() {
+        let input = vec![Range::One('a'), Range::One('b'), Range::One('c')];
+        let result = input.aggregate_ranges();
+        assert_eq!(
+            result,
+            vec![Range::Multi {
+                start: 'a',
+                end: 'c'
+            }]
+        );
+    }
+
+    #[test]
+    fn test_aggregate_ranges_non_consecutive() {
+        let input = vec![Range::One('a'), Range::One('c'), Range::One('e')];
+        let result = input.aggregate_ranges();
+        assert_eq!(
+            result,
+            vec![Range::One('a'), Range::One('c'), Range::One('e')]
+        );
+    }
+
+    #[test]
+    fn test_aggregate_ranges_mixed() {
+        let input = vec![
+            Range::One('a'),
+            Range::One('b'),
+            Range::One('d'),
+            Range::One('e'),
+            Range::One('f'),
+        ];
+        let result = input.aggregate_ranges();
+        assert_eq!(
+            result,
+            vec![
+                Range::Multi {
+                    start: 'a',
+                    end: 'b'
+                },
+                Range::Multi {
+                    start: 'd',
+                    end: 'f'
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_aggregate_overlapping_ranges() {
+        let input = vec![
+            Range::Multi {
+                start: 'a',
+                end: 'd',
+            },
+            Range::Multi {
+                start: 'b',
+                end: 'e',
+            },
+        ];
+        let expected = vec![Range::Multi {
+            start: 'a',
+            end: 'e',
+        }];
+        let result = input.aggregate_ranges();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_split_equivalence() {
+        let input = vec![
+            Range::One('a'),
+            Range::Multi {
+                start: 'a',
+                end: 'd',
+            },
+            Range::One('e'),
+            Range::Multi {
+                start: 'g',
+                end: 'i',
+            },
+            Range::Multi {
+                start: 'h',
+                end: 'l',
+            },
+        ];
+        let split = input.clone().split_ranges();
+        assert_ranges_equivalent(&split, &input);
+    }
+
+    #[test]
+    fn test_aggregate_equivalence() {
+        let input = vec![
+            Range::One('a'),
+            Range::Multi {
+                start: 'a',
+                end: 'd',
+            },
+            Range::One('e'),
+            Range::Multi {
+                start: 'g',
+                end: 'i',
+            },
+            Range::Multi {
+                start: 'h',
+                end: 'l',
+            },
+        ];
+        let aggregate = input.clone().aggregate_ranges();
+        assert_ranges_equivalent(&aggregate, &input);
+    }
+
+    #[test]
+    fn test_split_aggregate_equivalence() {
+        let input = vec![
+            Range::One('a'),
+            Range::Multi {
+                start: 'a',
+                end: 'd',
+            },
+            Range::One('e'),
+            Range::Multi {
+                start: 'g',
+                end: 'i',
+            },
+            Range::Multi {
+                start: 'h',
+                end: 'l',
+            },
+        ];
+        let split = input.clone().aggregate_ranges();
+        let aggregate = split.clone().split_ranges();
+
+        assert_ranges_equivalent(&split, &input);
+        assert_ranges_equivalent(&aggregate, &input);
+        assert_ranges_equivalent(&aggregate, &split);
+    }
+}
