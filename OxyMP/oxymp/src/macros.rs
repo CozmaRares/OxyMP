@@ -47,7 +47,7 @@ macro_rules! items {
     };
 }
 
-macro_rules! assert {
+macro_rules! oxymp_assert {
     ($cond:expr, $($args:tt)*) => {
         if !$cond {
             eprintln!("Assertion failed at {}:{}", file!(), line!());
@@ -56,20 +56,3 @@ macro_rules! assert {
     };
 }
 
-#[allow(unused_macros)]
-#[cfg(debug_assertions)]
-macro_rules! time {
-    ($str:expr, $($tt:tt)*) => {
-        {
-            let start = std::time::Instant::now();
-            let r = {
-                $($tt)*
-            };
-            let end = std::time::Instant::now();
-            let duration = end.duration_since(start);
-            println!("{} took {} milliseconds", $str, duration.as_millis());
-            r
-        }
-
-    };
-}

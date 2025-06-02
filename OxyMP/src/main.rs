@@ -65,7 +65,7 @@ use language::*;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = "1 + 2";
     let tokens = lexer::tokenize(input)?;
-    let (_inp, ast) = rd_parser::T1(tokens.clone().into())?;
+    let (_inp, ast) = rd_parser::E(tokens.clone().into())?;
 
     println!("{:#?}", input);
     println!("{:#?}", tokens);

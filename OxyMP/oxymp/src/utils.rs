@@ -45,13 +45,6 @@ impl<T, E: Into<syn::Error>, Iter: IntoIterator<Item = Result<T, E>>>
     }
 }
 
-struct SynErrorWrapper(proc_macro2::Span, &'static str);
-impl Into<syn::Error> for SynErrorWrapper {
-    fn into(self) -> syn::Error {
-        syn::Error::new(self.0, self.1)
-    }
-}
-
 pub fn multiple_attribute_error(
     spans: Vec<proc_macro2::Span>,
     primary_message: &'static str,
@@ -62,9 +55,9 @@ pub fn multiple_attribute_error(
         .enumerate()
         .map(|(idx, span)| {
             if idx == 0 {
-                SynErrorWrapper(span, primary_message)
+                syn::Error::new(span, primary_message)
             } else {
-                SynErrorWrapper(span, additional_message)
+                syn::Error::new(span, additional_message)
             }
         })
         .collect_errors()
@@ -85,7 +78,6 @@ const LOW_SURROGATE_END: u32 = 0xD7FF;
 const HIGH_SURROGATE_START: u32 = 0xE000;
 const MAX_CODEPOINT: u32 = 0x10FFFF;
 
-// TEST: test this
 impl CharHelper for char {
     fn next_char(&self) -> Option<char> {
         let mut code = *self as u32;
@@ -117,5 +109,116 @@ impl CharHelper for char {
         self.next_char()
             .map(|next_char| next_char == *other)
             .unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    mod char_helper {
+        use super::super::{
+            CharHelper, HIGH_SURROGATE_START, LOW_SURROGATE_END, MAX_CODEPOINT, MIN_CODEPOINT,
+        };
+
+        macro_rules! chr {
+            ($codepoint:expr) => {
+                char::from_u32($codepoint).unwrap()
+            };
+        }
+
+        #[test]
+        fn test_codepoints_exist() {
+            assert!(char::from_u32(MIN_CODEPOINT).is_some());
+            assert!(char::from_u32(LOW_SURROGATE_END).is_some());
+            assert!(char::from_u32(HIGH_SURROGATE_START).is_some());
+            assert!(char::from_u32(MAX_CODEPOINT).is_some());
+        }
+
+        #[test]
+        fn test_next() {
+            assert_eq!('a'.next_char(), Some('b'));
+            assert_eq!('A'.next_char(), Some('B'));
+            assert_eq!('0'.next_char(), Some('1'));
+        }
+
+        #[test]
+        fn test_max_next() {
+            assert_eq!(chr!(MAX_CODEPOINT).next_char(), None);
+        }
+
+        #[test]
+        fn test_surrogate_next() {
+            assert_eq!(
+                chr!(LOW_SURROGATE_END).next_char(),
+                Some(chr!(HIGH_SURROGATE_START))
+            );
+        }
+
+        #[test]
+        fn test_prev() {
+            assert_eq!('b'.prev_char(), Some('a'));
+            assert_eq!('B'.prev_char(), Some('A'));
+            assert_eq!('1'.prev_char(), Some('0'));
+        }
+
+        #[test]
+        fn test_min_prev() {
+            assert_eq!(chr!(MIN_CODEPOINT).prev_char(), None);
+        }
+
+        #[test]
+        fn test_surrogate_prev() {
+            assert_eq!(
+                chr!(HIGH_SURROGATE_START).prev_char(),
+                Some(chr!(LOW_SURROGATE_END))
+            );
+        }
+
+        #[test]
+        fn test_is_followed_by() {
+            assert_eq!('a'.is_followed_by(&'b'), true);
+        }
+
+        #[test]
+        fn test_not_is_followed_by() {
+            assert_eq!('a'.is_followed_by(&'c'), false);
+        }
+
+        #[test]
+        fn test_max_is_followed_by() {
+            assert_eq!(chr!(MAX_CODEPOINT).is_followed_by(&'a'), false);
+        }
+
+        #[test]
+        fn test_is_followed_by_surrogate() {
+            let c1 = chr!(LOW_SURROGATE_END);
+            let c2 = chr!(HIGH_SURROGATE_START);
+            assert_eq!(c1.is_followed_by(&c2), true);
+        }
+
+        #[test]
+        fn test_is_followed_by_not_followed() {
+            let c1 = chr!(1000);
+            let c2 = chr!(2000);
+            assert_eq!(c1.is_followed_by(&c2), false);
+        }
+
+        #[test]
+        fn test_consecutive_chars() {
+            for i in 0..100 {
+                let c = chr!(i);
+                let next_c = chr!(i + 1);
+                assert!(c.is_followed_by(&next_c));
+            }
+        }
+
+        #[test]
+        fn test_prev_next_consistency() {
+            for i in 1..101 {
+                let c = chr!(i);
+                if let Some(prev_c) = c.prev_char() {
+                    assert_eq!(prev_c.next_char(), Some(c));
+                }
+            }
+        }
     }
 }

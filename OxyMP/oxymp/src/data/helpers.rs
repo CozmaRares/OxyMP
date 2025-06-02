@@ -95,7 +95,7 @@ impl OxyMPAttr {
 
         let mut errors = Vec::new();
 
-        assert!(
+        oxymp_assert!(
             segments
                 .first()
                 .map(|segment| segment.ident.to_string())

@@ -10,6 +10,10 @@
 #[macro_use]
 mod macros;
 
+#[cfg(debug_assertions)]
+#[macro_use]
+mod dbg_macros;
+
 mod automata;
 mod data;
 mod generate;

@@ -16,7 +16,7 @@ impl From<char> for Range {
 
 impl From<(char, char)> for Range {
     fn from((start, end): (char, char)) -> Self {
-        assert!(
+        oxymp_assert!(
             start <= end,
             "start char should be less than or equal to end char"
         );
@@ -166,13 +166,13 @@ fn assert_non_duplicate_events(events: &Vec<Event>) {
     let mut iter = events.iter();
     let mut prev_event = iter.next().unwrap();
 
-    assert!(
+    oxymp_assert!(
         prev_event.event_type == EventType::Start,
         "first event must be a start event"
     );
 
     for event in iter {
-        assert!(
+        oxymp_assert!(
             event != prev_event,
             "event {}({}) is equal to the previous event {}({})",
             event.value,
@@ -193,7 +193,7 @@ fn assert_correct_events(events: &Vec<Event>) {
     let mut iter = events.iter().enumerate();
     let mut prev_event = iter.next().unwrap().1;
 
-    assert!(
+    oxymp_assert!(
         prev_event.event_type == EventType::Start,
         "first event must be a start event"
     );
@@ -203,14 +203,14 @@ fn assert_correct_events(events: &Vec<Event>) {
             (true, EventType::Start) => {}
             (false, EventType::End) => {}
             (true, EventType::End) => {
-                assert!(
+                oxymp_assert!(
                     false,
                     "end event {}({}) on even index {}",
                     event.value, event.value as u32, idx
                 )
             }
             (false, EventType::Start) => {
-                assert!(
+                oxymp_assert!(
                     false,
                     "start event {}({}) on odd index {}",
                     event.value, event.value as u32, idx
@@ -220,7 +220,7 @@ fn assert_correct_events(events: &Vec<Event>) {
 
         if prev_event.event_type == EventType::Start && event.event_type == EventType::End {
             // only Start-End pairs are allowed to have the same character
-            assert!(
+            oxymp_assert!(
                 event.value >= prev_event.value,
                 "event {}({}) at idx {} is not greater than or equal to previous event {}({})",
                 event.value,
@@ -230,8 +230,8 @@ fn assert_correct_events(events: &Vec<Event>) {
                 prev_event.value as u32,
             );
         } else {
-            assert!(
-                event.value >= prev_event.value,
+            oxymp_assert!(
+                event.value > prev_event.value,
                 "event {}({}) at idx {} is not greater than previous event {}({})",
                 event.value,
                 event.value as u32,
@@ -275,7 +275,7 @@ fn split_overlapping_events(events: Vec<Event>) -> Vec<Event> {
     let mut iter = events.into_iter();
     let first_event = iter.next().unwrap();
 
-    assert!(
+    oxymp_assert!(
         first_event.event_type == EventType::Start,
         "first event must be a start event"
     );
@@ -285,7 +285,7 @@ fn split_overlapping_events(events: Vec<Event>) -> Vec<Event> {
     let mut output = vec![first_event];
 
     for event in iter {
-        assert!(
+        oxymp_assert!(
             prev_endpoint_value <= event.value,
             "invalid event {}({}), previous event's value was {}({})",
             event.value,
@@ -296,7 +296,7 @@ fn split_overlapping_events(events: Vec<Event>) -> Vec<Event> {
 
         match (&active_ranges, &event.event_type) {
             (0, EventType::End) => {
-                assert!(
+                oxymp_assert!(
                     false,
                     "end event without start event {}({})",
                     event.value, event.value as u32
@@ -355,7 +355,7 @@ fn remove_nested_events(events: Vec<Event>) -> Vec<Event> {
     let mut iter = events.into_iter();
     let first_event = iter.next().unwrap();
 
-    assert!(
+    oxymp_assert!(
         first_event.event_type == EventType::Start,
         "first event must be a start event"
     );
@@ -365,7 +365,7 @@ fn remove_nested_events(events: Vec<Event>) -> Vec<Event> {
     let mut output = vec![first_event];
 
     for event in iter {
-        assert!(
+        oxymp_assert!(
             prev_endpoint_value <= event.value,
             "invalid event {}({}), previous event's value was {}({})",
             event.value,
@@ -378,7 +378,7 @@ fn remove_nested_events(events: Vec<Event>) -> Vec<Event> {
 
         match (&active_ranges, &event.event_type) {
             (0, EventType::End) => {
-                assert!(
+                oxymp_assert!(
                     false,
                     "end event without start event {}({})",
                     event.value, event.value as u32

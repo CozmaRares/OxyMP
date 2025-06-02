@@ -178,16 +178,16 @@ impl NFA {
     }
 
     fn assert_valid(&self) {
-        assert!(
+        oxymp_assert!(
             self.states.contains_key(&self.start_state()),
             "NFA start state not found"
         );
-        assert!(
+        oxymp_assert!(
             self.states.contains_key(&self.end_state()),
             "NFA end state not found"
         );
 
-        assert!(
+        oxymp_assert!(
             !self
                 .states
                 .get(&self.start_state())
@@ -196,7 +196,7 @@ impl NFA {
                 .is_empty(),
             "NFA start state must have at least one transition"
         );
-        assert!(
+        oxymp_assert!(
             self.states
                 .get(&self.end_state())
                 .unwrap()
@@ -209,7 +209,7 @@ impl NFA {
             match state.kind {
                 StateKind::Accepting => {}
                 _ => {
-                    assert!(
+                    oxymp_assert!(
                         matches!(state.tag, StateTag::None),
                         "NFA state {} is not accepting but has a tag",
                         state_id
@@ -218,20 +218,20 @@ impl NFA {
             }
 
             for (transition, next_state) in &state.transitions {
-                assert!(
+                oxymp_assert!(
                     self.states.contains_key(next_state),
                     "Transition target state {} not found",
                     next_state
                 );
 
-                assert!(
+                oxymp_assert!(
                     *next_state != self.start_state(),
                     "State {} can't have a transition to the start state",
                     state_id
                 );
 
                 match transition {
-                    Transition::Epsilon => assert!(
+                    Transition::Epsilon => oxymp_assert!(
                         next_state != state_id,
                         "State {} has an epsilon transition to itself",
                         state_id

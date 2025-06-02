@@ -188,12 +188,12 @@ impl DFA {
     fn assert_valid(&self) {
         let start_state = 1;
 
-        assert!(
+        oxymp_assert!(
             self.states.contains_key(&start_state),
             "DFA start state not found"
         );
 
-        assert!(
+        oxymp_assert!(
             !self
                 .states
                 .get(&start_state)
@@ -204,20 +204,20 @@ impl DFA {
         );
 
         for (state_id, state) in &self.states {
-            assert!(
+            oxymp_assert!(
                 state_id >= &start_state,
                 "State {} must have a higher id than the start state",
                 state_id
             );
 
             for (_, next_state) in &state.transitions {
-                assert!(
+                oxymp_assert!(
                     self.states.contains_key(next_state),
                     "Transition target state {} not found",
                     next_state
                 );
 
-                assert!(
+                oxymp_assert!(
                     *next_state != start_state,
                     "State {} can't have a transition to the start state",
                     state_id
