@@ -1,11 +1,7 @@
-// TODO: uncomment
 // All APIs need docs!
 // #![deny(missing_docs)]
 
-// TODO: change all unwraps to expect where no explanation is needed
 // TODO: reorganize the order of functions and data structures in all the modules
-// TODO: use assert! more often
-// TODO: use Vec::with_capacity whenever possible
 
 #[macro_use]
 mod macros;

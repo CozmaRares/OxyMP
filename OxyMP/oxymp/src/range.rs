@@ -78,7 +78,6 @@ impl<Iter: IntoIterator<Item = Range>> Ranges for Iter {
         make_ranges(events)
     }
 
-    // TEST: should also work with overlapping ranges
     fn aggregate_ranges(self) -> Vec<Range> {
         let mut events = compute_events(self);
         events = remove_nested_events(events);
@@ -422,7 +421,10 @@ fn make_ranges(events: Vec<Event>) -> Vec<Range> {
 
     while iter.peek().is_some() {
         let start_char = iter.next().unwrap().value;
-        let end_char = iter.next().unwrap().value;
+        let end_char = iter
+            .next()
+            .expect("ranges are asserted to have an even number of events")
+            .value;
 
         ranges.push((start_char, end_char).into());
     }

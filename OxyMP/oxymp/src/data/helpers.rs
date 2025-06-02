@@ -99,7 +99,7 @@ impl OxyMPAttr {
             segments
                 .first()
                 .map(|segment| segment.ident.to_string())
-                .unwrap_or_default()
+                .unwrap()
                 == "oxymp",
             "The first segment of the attribute must be 'oxymp'"
         );

@@ -83,6 +83,13 @@ impl syn::parse::Parse for ErrorAttr {
             return Err(syn::Error::new(path.span(), msg));
         }
 
+        let first_segment = path.segments.first().unwrap();
+
+        if first_segment.arguments != syn::PathArguments::None {
+            let msg = "Error structure must not have any generics";
+            return Err(syn::Error::new(first_segment.arguments.span(), msg));
+        }
+
         let ident = path.segments.first().unwrap().ident.clone();
 
         Ok(ErrorAttr(ident))
