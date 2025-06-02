@@ -30,7 +30,7 @@ fn generate_one(
 ) -> syn::Result<syn::Item> {
     let rules = parse_grammar(tokens_data, rd_data.grammar_rules)?;
 
-    let ast = generate_ast(&tokens_data.ident, &rules);
+    let parse_tree = generate_parse_tree(&tokens_data.ident, &rules);
     let parser = generate_parser(&rules, &tokens_data.ident);
 
     let tokens_ident = &tokens_data.ident;
@@ -43,16 +43,26 @@ fn generate_one(
     let _Result = Std::Result.path();
     let _Debug = Derive::Debug.path();
     let _Clone = Derive::Clone.path();
+    let _String = Std::String.path();
+    let _Display = Trait::Display.path();
+    let _Formatter = Std::Formatter.path();
+    let _FmtResult = Std::FmtResult.path();
+    let _write = Macro::Write.path();
+    let _writeln = Macro::Writeln.path();
+    let _Ok = Std::Ok.path();
+    let _Error = Trait::Error.path();
+    let _Clone = Derive::Clone.path();
+    let _format = Macro::Format.path();
 
     let parser_items = items! {
         type Token = super::#tokens_ident;
 
         #[derive(#_Debug, #_Clone)]
-        pub struct ParserInput {
+        pub struct Input {
             inp: #_Rc<[Token]>,
             cursor: #_usize,
         }
-        impl #_From<#_Vec<Token>> for ParserInput {
+        impl #_From<#_Vec<Token>> for Input {
             fn from(value: #_Vec<Token>) -> Self {
                 Self {
                     inp: value.into(),
@@ -60,7 +70,7 @@ fn generate_one(
                 }
             }
         }
-        impl ParserInput {
+        impl Input {
             fn peek(&self) -> #_Option<&Token> {
                 self.inp.get(self.cursor)
             }
@@ -71,13 +81,81 @@ fn generate_one(
                     cursor: self.cursor + 1,
                 }
             }
+
+            fn input(&self) -> #_Rc<[Token]> {
+                self.inp.clone()
+            }
         }
 
-        // TODO:
-        pub type ParserError = ();
-        pub type ParserState<T> = #_Result<(ParserInput, T), ParserError>;
+        #[derive(#_Debug)]
+        pub enum ErrorKind {
+            UnexpectedEof,
+            UnexpectedToken,
+            ChoiceFailed {
+                rule_name: #_String,
+                choice_idx: #_usize,
+                causes: #_Vec<Error>,
+            },
+        }
 
-        #ast
+        impl #_Display for ErrorKind {
+            fn fmt(&self, f: &mut #_Formatter<'_>) -> #_FmtResult {
+                match self {
+                    ErrorKind::UnexpectedEof => #_write!(f, "Unexpected end of input"),
+                    ErrorKind::UnexpectedToken => #_write!(f, "Unexpected token"),
+                    ErrorKind::ChoiceFailed { rule_name, choice_idx, causes } => {
+                        #_write!(f, "Choice '{}', from rule '{}', failed", choice_idx, rule_name)?;
+                        if !causes.is_empty() {
+                            #_writeln!(f, " due to:")?;
+                            for (i, cause) in causes.iter().enumerate() {
+                                #_writeln!(f, "  {}. {}", i + 1, cause)?;
+                            }
+                        }
+                        #_Ok(())
+                    }
+                }
+            }
+        }
+
+        #[derive(#_Debug)]
+        pub struct Error {
+            kind: ErrorKind,
+            input: #_Rc<[Token]>,
+            cursor: #_usize,
+            expected: #_Vec<#_String>,
+        }
+
+        impl #_Error for Error {}
+        impl #_Display for Error {
+            fn fmt(&self, f: &mut #_Formatter<'_>) -> #_FmtResult {
+                #_writeln!(f, "Parse error at index {}", self.cursor)?;
+                #_writeln!(f, "{}", self.kind)?;
+
+                if !self.expected.is_empty() {
+                    #_writeln!(f, "  Expected : {}", self.expected.join(", "))?;
+                };
+
+                #_writeln!(f, "Local context:")?;
+                let len = self.input.len();
+                let start = self.cursor.saturating_sub(5);
+                let end = ::std::cmp::min(self.cursor + 5, len + 1);
+
+                for i in start..end {
+                    let display = if i < len {
+                        #_format!("{}", self.input[i])
+                    } else {
+                        "<EOF>".to_string()
+                    };
+                    #_writeln!(f, " {:>4}: {}", i, display)?;
+                }
+
+                Ok(())
+            }
+        }
+
+        pub type State<T> = #_Result<(Input, T), Error>;
+
+        #parse_tree
         #parser
     };
 
@@ -86,14 +164,14 @@ fn generate_one(
     Ok(syn::Item::Mod(item_mod))
 }
 
-fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStream {
+fn generate_parse_tree(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStream {
     let _Debug = Derive::Debug.path();
 
     let structs = rules.iter().map(|GrammarRule { name, node }| {
-        let ASTNode {
+        let ParseTreeNode {
             main_struct,
             external_choices,
-        } = generate_ast_node(&name, node, tokens_ident);
+        } = generate_parse_tree_node(&name, node, tokens_ident);
 
         let external_choices = match external_choices {
             None => q! {},
@@ -106,22 +184,7 @@ fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStr
             #external_choices
             #[derive(#_Debug)]
             pub struct #rule_ident {
-                value: #main_struct
-            }
-
-            // TO be used by the user
-            impl #rule_ident {
-                pub fn value_ref(&self) -> &#main_struct {
-                    &self.value
-                }
-
-                pub fn value(self) -> #main_struct {
-                    self.value
-                }
-
-                // TODO:
-                //pub fn debug(&self) -> () { }
-                //pub fn trace(&self) -> () { }
+                pub value: #main_struct,
             }
         }
     });
@@ -131,12 +194,16 @@ fn generate_ast(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStr
     }
 }
 
-struct ASTNode {
+struct ParseTreeNode {
     main_struct: TokenStream,
     external_choices: Option<Vec<TokenStream>>,
 }
 
-fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Ident) -> ASTNode {
+fn generate_parse_tree_node(
+    rule_name: &String,
+    node: &GrammarNode,
+    tokens_ident: &syn::Ident,
+) -> ParseTreeNode {
     let _Box = Std::Box.path();
     let _Option = Std::Option.path();
     let _Debug = Derive::Debug.path();
@@ -144,14 +211,14 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
     match &node {
         GrammarNode::Rule(rule) => {
             let ident = idents::parser_rule(rule);
-            ASTNode {
+            ParseTreeNode {
                 main_struct: q! { #_Box<#ident> },
                 external_choices: None,
             }
         }
         GrammarNode::Token(token) => {
             let ident = idents::token_struct(tokens_ident, token);
-            ASTNode {
+            ParseTreeNode {
                 main_struct: q! { super::#ident },
                 external_choices: None,
             }
@@ -159,11 +226,11 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
         GrammarNode::List(exprs) => {
             let defs = exprs
                 .iter()
-                .map(|expr| generate_ast_node(name, expr, tokens_ident));
+                .map(|expr| generate_parse_tree_node(rule_name, expr, tokens_ident));
             let main_struct = defs.clone().map(|d| d.main_struct);
             let external_choices = defs.filter_map(|d| d.external_choices).flatten();
 
-            ASTNode {
+            ParseTreeNode {
                 main_struct: q! { ( #(#main_struct),* ) },
                 external_choices: Some(external_choices.collect()),
             }
@@ -171,7 +238,7 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
         GrammarNode::Choice(choices, choice_idx) => {
             let defs = choices
                 .iter()
-                .map(|choice| generate_ast_node(name, choice, tokens_ident));
+                .map(|choice| generate_parse_tree_node(rule_name, choice, tokens_ident));
             let enum_entries = defs
                 .clone()
                 .map(|d| d.main_struct)
@@ -185,7 +252,7 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
 
             let mut external_choices: Vec<_> =
                 defs.filter_map(|d| d.external_choices).flatten().collect();
-            let enum_ident = idents::choice_enum(name, *choice_idx);
+            let enum_ident = idents::choice_enum(rule_name, *choice_idx);
             external_choices.push(q! {
                 #[derive(#_Debug)]
                 pub enum #enum_ident {
@@ -193,15 +260,15 @@ fn generate_ast_node(name: &String, node: &GrammarNode, tokens_ident: &syn::Iden
                 }
             });
 
-            ASTNode {
+            ParseTreeNode {
                 main_struct: q! { #enum_ident },
                 external_choices: Some(external_choices),
             }
         }
         GrammarNode::Optional(opt) => {
-            let generated = generate_ast_node(name, opt, tokens_ident);
+            let generated = generate_parse_tree_node(rule_name, opt, tokens_ident);
             let main_struct = generated.main_struct;
-            ASTNode {
+            ParseTreeNode {
                 main_struct: q! { #_Option<#main_struct> },
                 external_choices: generated.external_choices,
             }
@@ -220,21 +287,21 @@ fn generate_parser(rules: &Vec<GrammarRule>, tokens_ident: &syn::Ident) -> Token
 }
 
 fn generate_method(
-    name: &String,
+    rule_name: &String,
     node: &GrammarNode,
     rules: &Vec<GrammarRule>,
     tokens_ident: &syn::Ident,
 ) -> TokenStream {
-    let defs = expand_node(name, node, false, 1, rules, tokens_ident);
+    let defs = expand_node(rule_name, node, false, 1, rules, tokens_ident);
     let toks = defs.0;
     let ident = defs.1;
 
-    let rule_ident = idents::parser_rule(name);
+    let rule_ident = idents::parser_rule(rule_name);
 
     let _Ok = Std::Ok.path();
 
     q! {
-        pub fn #rule_ident<'a>(inp: ParserInput) -> ParserState<#rule_ident> {
+        pub fn #rule_ident<'a>(inp: Input) -> State<#rule_ident> {
             #toks
             #_Ok((
                 inp,
@@ -245,7 +312,7 @@ fn generate_method(
 }
 
 fn expand_node(
-    name: &str,
+    rule_name: &str,
     node: &GrammarNode,
     needs_check: bool,
     node_idx: usize,
@@ -264,8 +331,8 @@ fn expand_node(
         GrammarNode::Rule(nested_rule) => {
             let rule_ident = idents::parser_rule(nested_rule);
             // TODO: implement depth limit
-            //let dir_set = compute_dir_set(nested_rule, node, 10, &data.0);
-            //let check = generate_token_check(rule, &dir_set, data.simple_types, needs_check);
+            // let dir_set = compute_dir_set(nested_rule, node, 10, rules);
+            // let check = generate_token_check(rule, &dir_set, data.simple_types, needs_check);
 
             q! {
                 //#check
@@ -279,19 +346,28 @@ fn expand_node(
 
             q! {
                 let #_Some(_current) = inp.peek() else {
-                return #_Err(()); // TODO: EOI
+                    return #_Err(Error {
+                        kind: ErrorKind::UnexpectedEof,
+                        input: inp.input(),
+                        cursor: inp.cursor,
+                        expected: vec![], // TODO:
+                    });
                 };
                 let (inp, #node_ident) = match super::#token_struct_entry::try_from_ref(_current) {
-                    #_None => return #_Err(()), // TODO: Unexpected
+                    #_None => return #_Err(Error {
+                        kind: ErrorKind::UnexpectedToken,
+                        input: inp.input(),
+                        cursor: inp.cursor,
+                        expected: vec![], // TODO:
+                    }),
                     #_Some(t) => (inp.advance(), t),
                 };
             }
         }
         GrammarNode::List(exprs) => {
-            let defs = exprs
-                .iter()
-                .enumerate()
-                .map(|(idx, expr)| expand_node(name, expr, idx != 0, idx + 1, rules, tokens_ident));
+            let defs = exprs.iter().enumerate().map(|(idx, expr)| {
+                expand_node(rule_name, expr, idx != 0, idx + 1, rules, tokens_ident)
+            });
             let toks = defs.clone().map(|d| d.0);
             let idents = defs.map(|d| d.1);
 
@@ -317,15 +393,15 @@ fn expand_node(
                 .map(|(idx, expr)| {
                     (
                         idx + 1,
-                        expand_node(name, expr, false, idx + 1, rules, tokens_ident),
+                        expand_node(rule_name, expr, false, idx + 1, rules, tokens_ident),
                     )
                 })
                 .map(|(idx, (toks, ident))| {
                     let idx_ident = idents::numeric(idx);
-                    let choice_ident = idents::choice_enum(name, *choice_idx);
+                    let choice_ident = idents::choice_enum(rule_name, *choice_idx);
 
                     q! {
-                        let r: ParserState<_> = (|| {
+                        let r: State<_> = (|| {
                             let inp = inp.clone();
                             #toks
                             #_Ok((inp, #ident))
@@ -344,18 +420,27 @@ fn expand_node(
                 let (inp, #node_ident) =  (|| {
                     #(#defs)*
 
-                    #_Err(()) // All choices failed
+                    #_Err(Error {
+                        kind: ErrorKind::ChoiceFailed {
+                            rule_name: "".to_string(), // TODO:
+                            choice_idx: #choice_idx,
+                            causes: vec![], // TODO:
+                        },
+                        input: inp.input(),
+                        cursor: inp.cursor,
+                        expected: vec![], // TODO:
+                    })
                 })()?;
             }
         }
         GrammarNode::Optional(opt) => {
-            let (toks, ident) = expand_node(name, opt, false, 1, rules, tokens_ident);
+            let (toks, ident) = expand_node(rule_name, opt, false, 1, rules, tokens_ident);
 
             //let dir_set = compute_dir_set(rule, node, data.depth_limit, rules);
             //let check = generate_token_check(rule, &dir_set, data.simple_types, needs_check);
 
             q! {
-                let res: ParserState<_> = (|| {
+                let res: State<_> = (|| {
                     //#check
                     let inp = inp.clone();
                     #toks
@@ -372,6 +457,7 @@ fn expand_node(
     (toks, node_ident)
 }
 
+// TEST: this
 #[derive(Clone)]
 struct DirectionSet<'a> {
     tokens: HashSet<&'a String>,
@@ -424,13 +510,13 @@ where
 
 // TODO:
 fn compute_dir_set<'a>(
-    current_rule: &String,
+    rule_name: &String,
     node: &'a GrammarNode,
     depth: usize,
     rules: &'a Vec<GrammarRule>,
 ) -> DirectionSet<'a> {
     if depth == 0 {
-        panic!("Possible left recursion deteted! Reached depth limit when computing the direction set for the rule: {}", current_rule);
+        panic!("Possible left recursion deteted! Reached the depth limit when computing the direction set for the rule: {}", rule_name);
     }
 
     match &node {
@@ -438,13 +524,13 @@ fn compute_dir_set<'a>(
             .iter()
             .find(|GrammarRule { name, .. }| name == rule)
             .map(|GrammarRule { name, node }| compute_dir_set(name, node, depth - 1, rules))
-            .unwrap(),
+            .expect("rule should exist"),
         GrammarNode::Token(token) => [token].into(),
         GrammarNode::List(list) => {
             let mut dir_set = DirectionSet::default().nullable();
 
             for list_node in list {
-                let node_set = compute_dir_set(current_rule, list_node, depth, rules);
+                let node_set = compute_dir_set(rule_name, list_node, depth, rules);
 
                 dir_set.extend(node_set, NullPropagation::IfAll);
 
@@ -456,10 +542,10 @@ fn compute_dir_set<'a>(
 
             dir_set
         }
-        GrammarNode::Optional(opt) => compute_dir_set(current_rule, opt, depth, rules).nullable(),
+        GrammarNode::Optional(opt) => compute_dir_set(rule_name, opt, depth, rules).nullable(),
         GrammarNode::Choice(choices, _) => choices
             .into_iter()
-            .map(|choice| compute_dir_set(current_rule, choice, depth, rules))
+            .map(|choice| compute_dir_set(rule_name, choice, depth, rules))
             .reduce(|mut a, b| {
                 a.extend(b, NullPropagation::IfAny);
                 a
