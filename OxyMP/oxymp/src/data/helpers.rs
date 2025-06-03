@@ -81,6 +81,7 @@ pub enum OxyMPAttr {
     Tokens,
     Lexer,
 
+    // TODO: remove features, keep rd
     #[cfg(feature = "rd")]
     RDParser,
 

@@ -9,8 +9,17 @@ pub struct Transition(pub Range);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StateTag {
-    Skip { pattern: String },
-    Token { variant: String, priority: usize },
+    // pattern is used for testing
+    #[cfg(debug_assertions)]
+    Skip {
+        pattern: String,
+    },
+    #[cfg(not(debug_assertions))]
+    Skip,
+    Token {
+        variant: String,
+        priority: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -19,16 +28,18 @@ pub enum StateKind {
     Accepting(StateTag),
 }
 
+type StateId = usize;
+
 #[derive(Debug, Clone)]
 pub struct State {
-    pub transitions: Vec<(Transition, usize)>,
+    pub transitions: Vec<(Transition, StateId)>,
     pub kind: StateKind,
 }
 
 #[derive(Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct DFA {
-    states: HashMap<usize, State>,
+    states: HashMap<StateId, State>,
 }
 
 // FIX: DFA can't compile properly after refactoring to ranges
@@ -36,31 +47,31 @@ pub fn compile(nfa: nfa::NFA) -> DFA {
     let alphabet = compute_alphabet(&nfa);
     let mut builder = DFABuilder::new(&nfa);
 
-    let nfa_starting_states = nfa.compute_epsilon_closure([nfa.start_state()]);
-    builder.create_state(nfa_starting_states);
+    let nfa_starting_state_ids = nfa.compute_epsilon_closure([nfa.start_state_id()]);
+    builder.create_state(nfa_starting_state_ids);
 
-    while !builder.unmarked_states.is_empty() {
-        let state_id = *builder.unmarked_states.iter().next().unwrap();
-        builder.unmarked_states.remove(&state_id);
+    while !builder.unmarked_state_ids.is_empty() {
+        let state_id = *builder.unmarked_state_ids.iter().next().unwrap();
+        builder.unmarked_state_ids.remove(&state_id);
         let dfa_state_nfa_equivalent_states = builder
             .states
             .get(&state_id)
             .expect("DFA state should exist")
-            .nfa_equivalent_states
+            .nfa_equivalent_state_ids
             .clone();
 
         for range in &alphabet {
-            let nfa_next_states =
-                simulate_transition(&nfa, &dfa_state_nfa_equivalent_states, range);
+            let nfa_next_state_ids =
+                simulate_nfa_transition(&nfa, &dfa_state_nfa_equivalent_states, range);
 
-            let nfa_next_states = nfa.compute_epsilon_closure(nfa_next_states);
+            let nfa_next_state_ids = nfa.compute_epsilon_closure(nfa_next_state_ids);
 
-            if nfa_next_states.is_empty() {
+            if nfa_next_state_ids.is_empty() {
                 continue;
             }
 
-            let next_state_id = match builder.get_equivalent_state(&nfa_next_states) {
-                None => builder.create_state(nfa_next_states),
+            let next_state_id = match builder.get_equivalent_state_id(&nfa_next_state_ids) {
+                None => builder.create_state(nfa_next_state_ids),
                 Some(id) => id,
             };
 
@@ -84,7 +95,7 @@ fn compress_char_classes(mut dfa: DFA) -> DFA {
         .into_iter()
         .map(|(id, mut state)| {
             // group transitions by target state
-            let mut transitions: HashMap<usize, Vec<Range>> = HashMap::new();
+            let mut transitions: HashMap<StateId, Vec<Range>> = HashMap::new();
 
             for (Transition(range), target) in state.transitions {
                 transitions.entry(target).or_default().push(range);
@@ -174,29 +185,30 @@ impl State {
         }
     }
 
-    fn add_transition(&mut self, transition: Transition, target: usize) {
-        self.transitions.push((transition, target));
+    fn add_transition(&mut self, transition: Transition, target_id: StateId) {
+        self.transitions.push((transition, target_id));
     }
 }
 
 impl DFA {
     #[inline]
-    pub fn states(&self) -> &HashMap<usize, State> {
+    pub fn states(&self) -> &HashMap<StateId, State> {
         &self.states
     }
 
     fn assert_valid(&self) {
-        let start_state = 1;
+        // State 1 is always the start state
+        let start_state_id = 1;
 
         oxymp_assert!(
-            self.states.contains_key(&start_state),
+            self.states.contains_key(&start_state_id),
             "DFA start state not found"
         );
 
         oxymp_assert!(
             !self
                 .states
-                .get(&start_state)
+                .get(&start_state_id)
                 .unwrap()
                 .transitions
                 .is_empty(),
@@ -204,21 +216,15 @@ impl DFA {
         );
 
         for (state_id, state) in &self.states {
-            oxymp_assert!(
-                state_id >= &start_state,
-                "State {} must have a higher id than the start state",
-                state_id
-            );
-
-            for (_, next_state) in &state.transitions {
+            for (_, next_state_id) in &state.transitions {
                 oxymp_assert!(
-                    self.states.contains_key(next_state),
+                    self.states.contains_key(next_state_id),
                     "Transition target state {} not found",
-                    next_state
+                    next_state_id
                 );
 
                 oxymp_assert!(
-                    *next_state != start_state,
+                    *next_state_id != start_state_id,
                     "State {} can't have a transition to the start state",
                     state_id
                 );
@@ -235,24 +241,23 @@ impl std::fmt::Debug for DFA {
         writeln!(f, "(DFA)")?;
 
         for state_id in state_ids {
-            if let Some(state) = self.states.get(&state_id) {
-                write!(f, "State {} {:?}: ", state_id, state.kind)?;
+            let state = self.states.get(&state_id).expect("state should exist");
+            write!(f, "State {} {:?}: ", state_id, state.kind)?;
 
-                if state.transitions.is_empty() {
-                    writeln!(f, "∅")?;
-                    continue;
-                }
-
-                for (i, t) in state.transitions.iter().enumerate() {
-                    write!(f, "{:?}", t)?;
-
-                    if i < state.transitions.len() - 1 {
-                        write!(f, ", ")?;
-                    }
-                }
-
-                writeln!(f)?;
+            if state.transitions.is_empty() {
+                writeln!(f, "∅")?;
+                continue;
             }
+
+            for (i, t) in state.transitions.iter().enumerate() {
+                write!(f, "{:?}", t)?;
+
+                if i < state.transitions.len() - 1 {
+                    write!(f, ", ")?;
+                }
+            }
+
+            writeln!(f)?;
         }
 
         Ok(())
@@ -260,28 +265,28 @@ impl std::fmt::Debug for DFA {
 }
 
 struct BuilderState {
-    nfa_equivalent_states: HashSet<usize>,
+    nfa_equivalent_state_ids: HashSet<StateId>,
     state: State,
 }
 
 impl BuilderState {
-    fn new(nfa_equivalent_states: HashSet<usize>, state: State) -> Self {
+    fn new(nfa_equivalent_state_ids: HashSet<StateId>, state: State) -> Self {
         Self {
-            nfa_equivalent_states,
+            nfa_equivalent_state_ids,
             state,
         }
     }
 
-    fn add_transition(&mut self, transition: Transition, target: usize) {
-        self.state.add_transition(transition, target);
+    fn add_transition(&mut self, transition: Transition, target_id: StateId) {
+        self.state.add_transition(transition, target_id);
     }
 }
 
 struct DFABuilder<'a> {
     nfa: &'a nfa::NFA,
-    states: HashMap<usize, BuilderState>,
+    states: HashMap<StateId, BuilderState>,
     state_id_counter: usize,
-    unmarked_states: HashSet<usize>,
+    unmarked_state_ids: HashSet<StateId>,
 }
 
 impl<'a> DFABuilder<'a> {
@@ -290,16 +295,16 @@ impl<'a> DFABuilder<'a> {
             nfa,
             state_id_counter: 0,
             states: HashMap::new(),
-            unmarked_states: HashSet::new(),
+            unmarked_state_ids: HashSet::new(),
         }
     }
 
-    fn create_state(&mut self, nfa_equivalent_states: HashSet<usize>) -> usize {
+    fn create_state(&mut self, nfa_equivalent_state_ids: HashSet<StateId>) -> StateId {
         let nfa_states: Vec<_> = self
             .nfa
             .states()
             .iter()
-            .filter(|(state_id, _)| nfa_equivalent_states.contains(state_id))
+            .filter(|(state_id, _)| nfa_equivalent_state_ids.contains(state_id))
             .collect();
 
         let mut kind = StateKind::NotAccepting;
@@ -318,22 +323,24 @@ impl<'a> DFABuilder<'a> {
 
         self.state_id_counter += 1;
         let id = self.state_id_counter;
-        let state = BuilderState::new(nfa_equivalent_states, State::new(kind));
+        let state = BuilderState::new(nfa_equivalent_state_ids, State::new(kind));
         self.states.insert(id, state);
-        self.unmarked_states.insert(id);
+        self.unmarked_state_ids.insert(id);
         id
     }
 
-    fn add_transition(&mut self, from: usize, to: usize, range: Range) {
-        if let Some(state) = self.states.get_mut(&from) {
-            state.add_transition(Transition(range), to);
-        }
+    fn add_transition(&mut self, from: StateId, to: StateId, range: Range) {
+        let state = self
+            .states
+            .get_mut(&from)
+            .expect("'from' state should exist");
+        state.add_transition(Transition(range), to);
     }
 
     // FIX: this is not performant ~ O(n^3)
-    fn get_equivalent_state(&self, nfa_equivalent_states: &HashSet<usize>) -> Option<usize> {
+    fn get_equivalent_state_id(&self, nfa_equivalent_state_ids: &HashSet<StateId>) -> Option<StateId> {
         for (id, state) in &self.states {
-            if state.nfa_equivalent_states == *nfa_equivalent_states {
+            if state.nfa_equivalent_state_ids == *nfa_equivalent_state_ids {
                 return Some(*id);
             }
         }
@@ -354,11 +361,11 @@ impl<'a> DFABuilder<'a> {
     }
 }
 
-fn simulate_transition<'a, I: IntoIterator<Item = &'a usize>>(
+fn simulate_nfa_transition<'a, I: IntoIterator<Item = &'a StateId>>(
     nfa: &nfa::NFA,
     starting_state_ids: I,
     range: &Range,
-) -> HashSet<usize> {
+) -> HashSet<StateId> {
     let mut state_ids = HashSet::new();
 
     for state_id in starting_state_ids {

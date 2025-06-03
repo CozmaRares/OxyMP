@@ -1,6 +1,8 @@
 // All APIs need docs!
 // #![deny(missing_docs)]
 // TODO: rustdoc compatible documentation
+// TODO: see if you can include structs only when generating docs
+// to be used to document the generated data structures
 
 // TODO: reorganize the order of functions and data structures in all the modules
 
