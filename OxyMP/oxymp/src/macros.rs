@@ -26,6 +26,7 @@ macro_rules! pq {
                     let msg = crate::macros::extract_panic_message(&e).unwrap_or_else(
                         || "Panic occurred, but message could not be retrieved.".to_string()
                     );
+                    eprintln!("input:\n{:#?}", ::quote::quote!($($tt)*));
                     std::panic!("{}", msg);
                 }
             }

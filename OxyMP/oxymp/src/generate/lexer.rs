@@ -240,7 +240,7 @@ fn compute_tokens_nfa(tokens_data: &TokensData) -> syn::Result<NFA> {
             })
         })
         .collect_errors()
-        .map(|nfas| nfa::combine(nfas))
+        .map(nfa::combine)
 }
 
 fn generate_lexer_dfa(
@@ -340,7 +340,7 @@ fn generate_match_branches<'a>(
 ) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
     let method = format_ident!("{}", method);
     idents.iter().map(move |ident| {
-        let args = args.into_iter().map(|arg| format_ident!("{}", arg));
+        let args = args.iter().map(|arg| format_ident!("{}", arg));
         q! { State::#ident => #ident::#method(#(#args),*), }
     })
 }

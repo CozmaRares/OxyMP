@@ -164,14 +164,14 @@ fn generate_one(
     Ok(syn::Item::Mod(item_mod))
 }
 
-fn generate_parse_tree(tokens_ident: &syn::Ident, rules: &Vec<GrammarRule>) -> TokenStream {
+fn generate_parse_tree(tokens_ident: &syn::Ident, rules: &[GrammarRule]) -> TokenStream {
     let _Debug = Derive::Debug.path();
 
     let structs = rules.iter().map(|GrammarRule { name, node }| {
         let ParseTreeNode {
             main_struct,
             external_choices,
-        } = generate_parse_tree_node(&name, node, tokens_ident);
+        } = generate_parse_tree_node(name, node, tokens_ident);
 
         let external_choices = match external_choices {
             None => q! {},
@@ -422,7 +422,7 @@ fn expand_node(
 
                     #_Err(Error {
                         kind: ErrorKind::ChoiceFailed {
-                            rule_name: "".to_string(), // TODO:
+                            rule_name: #rule_name.to_string(),
                             choice_idx: #choice_idx,
                             causes: vec![], // TODO:
                         },
@@ -458,7 +458,7 @@ fn expand_node(
 }
 
 // TEST: this
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct DirectionSet<'a> {
     tokens: HashSet<&'a String>,
     nullable: bool,
@@ -483,15 +483,6 @@ impl<'a> DirectionSet<'a> {
         match nullability {
             NullPropagation::IfAny => self.nullable = self.nullable || other.nullable,
             NullPropagation::IfAll => self.nullable = self.nullable && other.nullable,
-        }
-    }
-}
-
-impl<'a> Default for DirectionSet<'a> {
-    fn default() -> Self {
-        Self {
-            tokens: HashSet::new(),
-            nullable: false,
         }
     }
 }
@@ -544,7 +535,7 @@ fn compute_dir_set<'a>(
         }
         GrammarNode::Optional(opt) => compute_dir_set(rule_name, opt, depth, rules).nullable(),
         GrammarNode::Choice(choices, _) => choices
-            .into_iter()
+            .iter()
             .map(|choice| compute_dir_set(rule_name, choice, depth, rules))
             .reduce(|mut a, b| {
                 a.extend(b, NullPropagation::IfAny);

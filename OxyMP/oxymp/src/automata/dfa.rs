@@ -379,13 +379,10 @@ fn simulate_nfa_transition<'a, I: IntoIterator<Item = &'a StateId>>(
         let state = nfa.states().get(state_id).expect("state not found");
 
         for (transition, next_state_id) in &state.transitions {
-            match transition {
-                nfa::Transition::Range(transition_range) => {
-                    if transition_range.contains_range(range) {
-                        state_ids.insert(*next_state_id);
-                    }
+            if let nfa::Transition::Range(transition_range) = transition {
+                if transition_range.contains_range(range) {
+                    state_ids.insert(*next_state_id);
                 }
-                _ => {}
             }
         }
     }

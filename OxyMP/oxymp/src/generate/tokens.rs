@@ -79,7 +79,6 @@ fn generate_try_from(tokens_ident: &syn::Ident, variant: &TokenVariant) -> syn::
 
     let struct_ident = idents::token_struct(tokens_ident, variant_ident);
 
-    // FIX: Clone could not be derived for the fields
     let (fields_stream, fields_cloned) = match fields {
         syn::Fields::Named(fields_named) => {
             let iter = fields_named.named.iter().map(|field| match &field.ident {
@@ -96,8 +95,8 @@ fn generate_try_from(tokens_ident: &syn::Ident, variant: &TokenVariant) -> syn::
                 .iter()
                 .enumerate()
                 .map(|(idx, _)| idents::numeric(idx))
-                .map(|ident| (q! { #ident.clone() }, ident));
-            let (idents_cloned, idents) = split_iter(iter);
+                .map(|ident| (ident.clone(), q! { #ident.clone() }));
+            let (idents, idents_cloned) = split_iter(iter);
             (q! { ( #(#idents),* ) }, q! { ( #(#idents_cloned),* ) })
         }
         syn::Fields::Unit => (q! {}, q! {}),

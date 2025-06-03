@@ -177,7 +177,7 @@ impl NFA {
         self
     }
 
-    fn to_not_accepting_states(&mut self) {
+    fn convert_states_to_not_accepting(&mut self) {
         self.states
             .iter_mut()
             .for_each(|(_, state)| state.kind = StateKind::NotAccepting);
@@ -236,13 +236,12 @@ impl NFA {
                     state_id
                 );
 
-                match transition {
-                    Transition::Epsilon => oxymp_assert!(
+                if let Transition::Epsilon = transition {
+                    oxymp_assert!(
                         next_state_id != state_id,
                         "State {} has an epsilon transition to itself",
                         state_id
-                    ),
-                    _ => {}
+                    )
                 }
             }
         }
@@ -445,7 +444,7 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
 
     if repetition.min > 0 {
         let mut nfa_not_accepting = nfa.clone();
-        nfa_not_accepting.to_not_accepting_states();
+        nfa_not_accepting.convert_states_to_not_accepting();
 
         // first min-1 NFAs must not accept transformations
         for _ in 1..repetition.min {
@@ -511,7 +510,7 @@ fn visit_concat(hirs: &[Hir]) -> Result<NFA, UnsupportedFeature> {
         let mut nfa = visit_hir(hir)?;
 
         if idx != hirs.len() - 1 {
-            nfa.to_not_accepting_states();
+            nfa.convert_states_to_not_accepting();
         }
 
         builder.append_nfa(builder.end_state_id(), nfa);

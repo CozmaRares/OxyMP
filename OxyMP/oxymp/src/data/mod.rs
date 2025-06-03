@@ -70,8 +70,7 @@ pub fn process_module(mut module: syn::ItemMod) -> syn::Result<Data> {
         }
     });
 
-    let items = iter.collect_errors()?;
-    let items = items.into_iter().filter_map(|i| i).collect();
+    let items = iter.collect_errors()?.into_iter().flatten().collect();
 
     module.content = Some((brace, items));
     builder.build(module)

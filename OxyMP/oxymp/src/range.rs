@@ -157,7 +157,7 @@ impl Ord for Event {
     }
 }
 
-fn assert_non_duplicate_events(events: &Vec<Event>) {
+fn assert_non_duplicate_events(events: &[Event]) {
     if events.is_empty() {
         return;
     }
@@ -184,7 +184,7 @@ fn assert_non_duplicate_events(events: &Vec<Event>) {
 }
 
 // events should come paris, in sorted order
-fn assert_correct_events(events: &Vec<Event>) {
+fn assert_correct_events(events: &[Event]) {
     if events.is_empty() {
         return;
     }
@@ -454,7 +454,7 @@ fn combine_adjacent_ranges(ranges: Vec<Range>) -> Vec<Range> {
     let mut iter = ranges.into_iter();
     let mut current_range = iter.next().unwrap();
 
-    while let Some(next_range) = iter.next() {
+    for next_range in iter {
         if overlap(&current_range, &next_range) || are_adjacent(&current_range, &next_range) {
             let start = std::cmp::min(current_range.start(), next_range.start());
             let end = std::cmp::max(current_range.end(), next_range.end());
