@@ -27,7 +27,7 @@ mod language {
         #[exact("if")]
         If,
 
-        #[exact("i[a-z]")]
+        #[exact("你")]
         If2,
 
         #[regex(r"[a-z]+", match_ident)]
@@ -62,8 +62,9 @@ mod language {
 }
 use language::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let input = "1 + 2";
+fn helper() -> Result<(), Box<dyn std::error::Error>> {
+    let input = "你 ! 1 + 2";
+
     let tokens = lexer::tokenize(input)?;
     let (_inp, ast) = rd_parser::E(tokens.clone().into())?;
 
@@ -73,6 +74,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", ast.visit());
 
     Ok(())
+}
+
+fn main() {
+    if let Err(e) = helper() {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
 }
 
 impl rd_parser::E {

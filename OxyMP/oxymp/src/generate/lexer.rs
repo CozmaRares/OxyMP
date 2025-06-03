@@ -521,49 +521,55 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
             let mut state = State::_1;
             let mut match_start = 0;
             let mut iter = inp.chars().enumerate().peekable();
+            let input_length = inp.chars().count();
+            let mut char_offset = 0;
 
             while iter.peek().is_some() {
                 let mut last_accepting_state = #_None;
                 let mut last_accepting_pos = match_start;
-                let mut temp_state = state.clone();
-                let mut temp_pos = iter.peek().map(|(pos, _)| *pos).unwrap_or(inp.len());
+                let mut last_accepting_offset = char_offset;
 
+                let mut temp_state = state.clone();
                 let mut temp_iter = iter.clone();
+                let mut temp_offset = char_offset;
+
                 while let #_Some((pos, ch)) = temp_iter.peek() {
                     if let #_Some(new_state) = temp_state.transition(*ch) {
-                        temp_state = new_state;
-                        temp_pos = *pos + 1;
+                        let temp_state = new_state;
+                        let temp_pos = *pos + 1;
+
+                        let (_, ch) = temp_iter.next().expect("should have a next token");
+                        temp_offset += ch.len_utf8();
 
                         if temp_state.is_accepting() {
                             last_accepting_state = #_Some(temp_state.clone());
                             last_accepting_pos = temp_pos;
+                            last_accepting_offset = temp_offset;
                         }
-
-                        temp_iter.next();
                     } else {
                         break;
                     }
                 }
 
                 if let #_Some(accepting_state) = last_accepting_state {
-                    while iter.peek().map(|(pos, _)| *pos).unwrap_or(inp.len()) < last_accepting_pos
-                    {
-                        iter.next();
+                    while iter.peek().map(|(pos, _)| *pos).unwrap_or(input_length) < last_accepting_pos {
+                        let (_, ch) = iter.next().expect("should have a next token");
+                        char_offset += ch.len_utf8();
                     }
 
                     if let #_Some(tok) = accepting_state
-                        .accept(&inp[match_start..last_accepting_pos])
+                        .accept(&inp[match_start..last_accepting_offset])
                         .map_err(Error::UserTransform)?
                     {
                         toks.push(tok);
                     }
 
                     state = State::_1;
-                    match_start = last_accepting_pos;
+                    match_start = last_accepting_offset;
                 } else {
                     let (pos, ch) = iter.peek().expect("was previously checked to be Some");
                     // TODO: get last line of input & a slice where the error is
-                    return #_Err(state.reject(&inp, *ch, *pos));
+                    return #_Err(state.reject(&inp, *ch, char_offset));
                 }
             }
 

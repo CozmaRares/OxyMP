@@ -42,7 +42,6 @@ pub struct DFA {
     states: HashMap<StateId, State>,
 }
 
-// FIX: DFA can't compile properly after refactoring to ranges
 pub fn compile(nfa: nfa::NFA) -> DFA {
     let alphabet = compute_alphabet(&nfa);
     let mut builder = DFABuilder::new(&nfa);

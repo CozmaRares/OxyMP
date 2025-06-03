@@ -391,16 +391,15 @@ fn visit_hir(hir: &Hir) -> Result<NFA, UnsupportedFeature> {
 }
 
 fn visit_literal(literal: &Literal) -> NFA {
-    let literal = String::from_utf8(literal.0.to_vec())
-        // TODO: error message to say this is a bug
-        .expect("invalid UTF-8 parsed by regex_syntax");
+    let literal =
+        String::from_utf8(literal.0.to_vec()).expect("regex_syntax bug: invalid UTF-8 parsed");
 
     let mut builder = NFABuilder::new();
-
     let mut parent_id = builder.start_state_id();
+    let last_idx = literal.chars().count() - 1;
 
     for (idx, c) in literal.chars().enumerate() {
-        let kind = if idx == literal.len() - 1 {
+        let kind = if idx == last_idx {
             StateKind::Accepting
         } else {
             StateKind::NotAccepting
