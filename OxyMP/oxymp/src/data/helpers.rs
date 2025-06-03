@@ -80,13 +80,7 @@ impl From<MarkerAttrError> for syn::Error {
 pub enum OxyMPAttr {
     Tokens,
     Lexer,
-
-    // TODO: remove features, keep rd
-    #[cfg(feature = "rd")]
     RDParser,
-
-    #[cfg(feature = "lr")]
-    LRParser,
 }
 
 impl OxyMPAttr {
@@ -126,15 +120,8 @@ impl OxyMPAttr {
 
         let oxymp_attr = match feature.as_str() {
             "Tokens" => OxyMPAttr::Tokens,
-
             "Lexer" => OxyMPAttr::Lexer,
-
-            #[cfg(feature = "rd")]
             "RDParser" => OxyMPAttr::RDParser,
-
-            #[cfg(feature = "lr")]
-            "LRParser" => Self::LRParser,
-
             _ => return Err(MarkerAttrError::UnknowAttr(segments[1].span())),
         };
 
