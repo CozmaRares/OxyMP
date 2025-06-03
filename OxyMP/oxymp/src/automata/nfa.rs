@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-// TODO: consistent naming: state_id for usize and state for State
-
 use regex_syntax::{
     hir::{Class, ClassUnicode, Hir, HirKind, Literal, Repetition},
     parse,
@@ -487,7 +485,11 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
             Transition::Epsilon,
         );
         builder.append_nfa(state_before_loop, nfa);
-        builder.add_transition(builder.end_state_id(), state_before_loop, Transition::Epsilon);
+        builder.add_transition(
+            builder.end_state_id(),
+            state_before_loop,
+            Transition::Epsilon,
+        );
 
         let end_state = builder.create_state(StateKind::Inherit);
         builder.add_transition(state_before_loop, end_state, Transition::Epsilon);

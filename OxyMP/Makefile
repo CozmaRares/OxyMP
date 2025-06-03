@@ -1,7 +1,7 @@
 all: run
 
 build:
-	@cargo build $(ARGS)
+	@cargo build --release $(ARGS)
 
 run:
 	@cargo run $(ARGS)

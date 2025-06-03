@@ -253,9 +253,12 @@ fn generate_lexer_dfa(
         let pattern = pattern_lit.value();
         let nfa = nfa::compile(
             &pattern,
+            #[cfg(debug_assertions)]
             nfa::StateTag::Skip {
                 pattern: pattern.clone(),
             },
+            #[cfg(not(debug_assertions))]
+            nfa::StateTag::Skip,
         )
         .map_err(|e| {
             syn::Error::new(

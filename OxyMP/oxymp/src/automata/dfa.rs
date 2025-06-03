@@ -148,7 +148,11 @@ impl TryFrom<nfa::StateTag> for StateTag {
         match value {
             nfa::StateTag::None => Err(()),
             nfa::StateTag::Token { variant, priority } => Ok(StateTag::Token { variant, priority }),
+
+            #[cfg(debug_assertions)]
             nfa::StateTag::Skip { pattern } => Ok(StateTag::Skip { pattern }),
+            #[cfg(not(debug_assertions))]
+            nfa::StateTag::Skip => Ok(StateTag::Skip),
         }
     }
 }
@@ -338,7 +342,10 @@ impl<'a> DFABuilder<'a> {
     }
 
     // FIX: this is not performant ~ O(n^3)
-    fn get_equivalent_state_id(&self, nfa_equivalent_state_ids: &HashSet<StateId>) -> Option<StateId> {
+    fn get_equivalent_state_id(
+        &self,
+        nfa_equivalent_state_ids: &HashSet<StateId>,
+    ) -> Option<StateId> {
         for (id, state) in &self.states {
             if state.nfa_equivalent_state_ids == *nfa_equivalent_state_ids {
                 return Some(*id);
