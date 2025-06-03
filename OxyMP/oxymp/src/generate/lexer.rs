@@ -92,7 +92,7 @@ impl LexerCache {
 
     fn get_tokens_nfa(&mut self, tokens_data: &TokensData) -> syn::Result<&NFA> {
         if self.tokens_nfa.is_none() {
-            let nfa = generate_tokens_nfa(tokens_data)?;
+            let nfa = compute_tokens_nfa(tokens_data)?;
             self.tokens_nfa = Some(nfa);
         }
         let nfa = self.tokens_nfa.as_ref().expect("tokens nfa should be set");
@@ -210,36 +210,37 @@ fn generate_error_ds() -> ErrorItem {
     }
 }
 
-fn generate_tokens_nfa(tokens_data: &TokensData) -> syn::Result<NFA> {
-    let mut token_nfas = Vec::new();
+// TODO: enusure all functions that return a syn::Result and have a for loop use the FoldErrors trait
+fn compute_tokens_nfa(tokens_data: &TokensData) -> syn::Result<NFA> {
+    tokens_data
+        .variants
+        .iter()
+        .enumerate()
+        .map(|(idx, variant)| {
+            let pattern = match &variant.pattern {
+                TokenPattern::Exact { pattern } => pattern.value(),
+                TokenPattern::Regex { pattern, .. } => pattern.value(),
+            };
 
-    for (idx, variant) in tokens_data.variants.iter().enumerate() {
-        let pattern = match &variant.pattern {
-            TokenPattern::Exact { pattern } => pattern.value(),
-            TokenPattern::Regex { pattern, .. } => pattern.value(),
-        };
-
-        let nfa = nfa::compile(
-            &pattern,
-            nfa::StateTag::Token {
-                variant: variant.ident.to_string(),
-                priority: idx,
-            },
-        )
-        .map_err(|e| {
-            syn::Error::new(
-                variant.pattern.span(),
-                format!(
-                    "Error while compiling regex pattern for token variant '{}'\n{}",
-                    variant.ident, e
-                ),
+            nfa::compile(
+                &pattern,
+                nfa::StateTag::Token {
+                    variant: variant.ident.to_string(),
+                    priority: idx,
+                },
             )
-        })?;
-
-        token_nfas.push(nfa);
-    }
-
-    Ok(nfa::combine(token_nfas))
+            .map_err(|e| {
+                syn::Error::new(
+                    variant.pattern.span(),
+                    format!(
+                        "Error while compiling regex pattern for token variant '{}'\n{}",
+                        variant.ident, e
+                    ),
+                )
+            })
+        })
+        .collect_errors()
+        .map(|nfas| nfa::combine(nfas))
 }
 
 fn generate_lexer_dfa(

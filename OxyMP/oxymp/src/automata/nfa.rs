@@ -7,26 +7,23 @@ use regex_syntax::{
 
 use crate::{range::Range, utils::capitalize};
 
-// TODO: report common regexes that are not supported
 #[derive(Debug, thiserror::Error)]
 pub enum UnsupportedFeature {
-    #[error("empty pattern")]
+    #[error("empty pattern (e.g., `\"\"`)")]
     EmptyPattern,
-    #[error("lookahead pattern")] // ^, $
+    #[error("lookahead pattern (e.g., `^abc`, `abc$`)")]
     LookaheadPattern,
-    #[error("byte char class")]
+    #[error("byte char class (e.g., `(?i-u)a`)")]
     ByteCharClass,
 }
 
-// TODO: change these errors
-// users should not know about the automata
 #[derive(Debug, thiserror::Error)]
 pub enum NFACompileError {
     #[error("{}", capitalize(format!("{}", .0)))]
     Message(#[from] Box<regex_syntax::Error>),
-    #[error("NFA compilation encountered an unsupported regex feature: {0}")]
+    #[error("Regex compilation encountered an unsupported regex feature: {0}")]
     Unsupported(#[from] UnsupportedFeature),
-    #[error("NFA compiled from '{0}' allows matching an empty string. Token variants must match at least one character.")]
+    #[error("Pattern '{0}' allows matching an empty string. The pattern must always match at least one character.")]
     PatternMatchesEmptyString(String),
 }
 
