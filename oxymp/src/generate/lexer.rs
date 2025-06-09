@@ -111,8 +111,8 @@ struct ErrorItem {
 }
 
 fn generate_error_ds() -> ErrorItem {
-    let LexerExpected = format_ident!("__Lexer_Common_Expected_{}", rand::random::<u64>());
-    let LexerError = format_ident!("__Lexer_Common_Error_{}", rand::random::<u64>());
+    let LexerExpected = format_ident!("__oxymp_helper_Lexer_Expected_{}", rand::random::<u64>());
+    let LexerError = format_ident!("__oxymp_helper_Lexer_Error_{}", rand::random::<u64>());
 
     let _char = Core::Char.path();
     let _Display = Trait::Display.path();
@@ -164,7 +164,7 @@ fn generate_error_ds() -> ErrorItem {
                 source: #_String,
                 offset: #_usize,
             },
-            UserTransform(T),
+            UserMatcher(T),
         }
 
         impl<T: #_Error> #_Error for #LexerError<T> {}
@@ -195,7 +195,7 @@ fn generate_error_ds() -> ErrorItem {
                         }
                         #_writeln!(f, "^ --- here")
                     }
-                    #LexerError::UserTransform(e) => #_writeln!(f, "User transform error: {}", e),
+                    #LexerError::UserMatcher(e) => #_writeln!(f, "User matcher error: {}", e),
                 }
             }
         }
@@ -292,26 +292,26 @@ fn generate_mod(
 
     let states = generate_states(&dfa);
 
-    let token_transforms = tokens_data
+    let token_matchers = tokens_data
         .variants
         .iter()
         .map(|variant| {
             let variant_ident = variant.ident.clone();
             let ident = variant.ident.to_string();
 
-            let transform = match &variant.pattern {
+            let matcher = match &variant.pattern {
                 TokenPattern::Exact { .. } => q! { Token::#variant_ident },
-                TokenPattern::Regex { transform, .. } => q! {
-                    super::#transform(inp)
+                TokenPattern::Regex { matcher, .. } => q! {
+                    super::#matcher(inp)
                         .map(Token::#variant_ident)?
                 },
             };
 
-            (ident, transform)
+            (ident, matcher)
         })
         .collect();
 
-    let methods = generate_state_methods(&dfa, &token_transforms);
+    let methods = generate_state_methods(&dfa, &token_matchers);
 
     let tokens_ident = &tokens_data.ident;
 
@@ -324,7 +324,7 @@ fn generate_mod(
         type Token = super::#tokens_ident;
         type UserError = super::#user_error_ident;
         pub type Error = super::#error_ident<UserError>;
-        pub type LexerExpected = super::#expected_ident;
+        pub type Expected = super::#expected_ident;
 
         #states
         #(#methods)*
@@ -405,7 +405,7 @@ fn generate_states(dfa: &DFA) -> proc_macro2::TokenStream {
 
 fn generate_state_methods<'a>(
     dfa: &'a DFA,
-    token_transforms: &'a HashMap<String, proc_macro2::TokenStream>,
+    token_matchers: &'a HashMap<String, proc_macro2::TokenStream>,
 ) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
     let _Some = Std::Some.path();
     let _Err = Std::Err.path();
@@ -442,10 +442,10 @@ fn generate_state_methods<'a>(
             DFAStateKind::NotAccepting => q! { #_unreachable!("The 'accept' method should not be called on a DFA state that is not accepting. This is most likely a bug in the lexer.") },
             DFAStateKind::Accepting(tag) => match tag {
                 DFAStateTag::Token { variant, .. } => {
-                    let transform = token_transforms
+                    let matcher = token_matchers
                         .get(variant)
-                        .expect("token pattern should always have an transform");
-                    q! { #_Ok(#_Some(#transform)) }
+                        .expect("token pattern should always have a matcher");
+                    q! { #_Ok(#_Some(#matcher)) }
                 }
                 DFAStateTag::Skip { .. } => q! { #_Ok(#_None) },
             }
@@ -460,10 +460,10 @@ fn generate_state_methods<'a>(
                         .iter()
                         .map(|(DFATransition(range), _)| match range {
                             Range::One(c) => q! {
-                                LexerExpected::Char(#c)
+                                Expected::Char(#c)
                             },
                             Range::Multi { start, end } => q! {
-                                LexerExpected::CharRange{ start: #start, end: #end }
+                                Expected::CharRange{ start: #start, end: #end }
                             },
                         });
 
@@ -515,6 +515,7 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
     let _None = Std::None.path();
     let _Err = Std::Err.path();
 
+    // FIX: e stricat
     q! {
         pub fn tokenize(inp: &#_str) -> #_Result<#_Vec<Token>, Error> {
             let mut toks = #_Vec::new();
@@ -559,7 +560,7 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
 
                     if let #_Some(tok) = accepting_state
                         .accept(&inp[match_start..last_accepting_offset])
-                        .map_err(Error::UserTransform)?
+                        .map_err(Error::UserMatcher)?
                     {
                         toks.push(tok);
                     }
@@ -576,7 +577,7 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
             if match_start < inp.len() {
                 if let #_Some(tok) = state
                     .accept(&inp[match_start..])
-                    .map_err(Error::UserTransform)?
+                    .map_err(Error::UserMatcher)?
                 {
                     toks.push(tok);
                 }

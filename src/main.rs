@@ -6,7 +6,7 @@ mod matchers;
 mod language {
     use crate::matchers::*;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug)]
     #[oxymp::Tokens]
     pub enum Tok {
         #[regex(r"[1-9][0-9]*(\.[0-9]+)?", match_number)]
@@ -34,21 +34,6 @@ mod language {
         Ident(String),
     }
 
-    impl std::fmt::Display for Tok {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Tok::Number(n) => write!(f, "{}", n),
-                Tok::ParenLeft => write!(f, "("),
-                Tok::ParenRight => write!(f, ")"),
-                Tok::Plus => write!(f, "+"),
-                Tok::Minus => write!(f, "-"),
-                Tok::If => write!(f, "if"),
-                Tok::If2 => write!(f, "if2"),
-                Tok::Ident(s) => write!(f, "{}", s),
-            }
-        }
-    }
-
     #[oxymp::Lexer]
     #[skip(r"[ \t]+")]
     #[error(TokenizeError)]
@@ -66,10 +51,10 @@ fn helper() -> Result<(), Box<dyn std::error::Error>> {
     let input = "你 ! 1 + 2";
 
     let tokens = lexer::tokenize(input)?;
-    let (_inp, ast) = rd_parser::E(tokens.clone().into())?;
+    let (_inp, ast) = rd_parser::E(tokens.into())?;
 
     println!("{:#?}", input);
-    println!("{:#?}", tokens);
+    // println!("{:#?}", tokens);
     println!("{:#?}", ast);
     println!("{}", ast.visit());
 

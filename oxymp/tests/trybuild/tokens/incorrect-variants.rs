@@ -7,7 +7,7 @@ mod l {
 
 // === REGEX ===
 
-// missing transformer function
+// missing matcher function
 #[oxymp::oxymp]
 mod l1 {
     #[oxymp::Tokens]
@@ -59,7 +59,7 @@ mod l4 {
     }
 }
 
-// transform function is not a path
+// matcher function is not a path
 #[oxymp::oxymp]
 mod l5 {
     #[oxymp::Tokens]

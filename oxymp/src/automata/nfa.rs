@@ -445,7 +445,7 @@ fn visit_repetition(repetition: &Repetition) -> Result<NFA, UnsupportedFeature> 
         let mut nfa_not_accepting = nfa.clone();
         nfa_not_accepting.convert_states_to_not_accepting();
 
-        // first min-1 NFAs must not accept transformations
+        // first min-1 NFAs must not have any accepting states
         for _ in 1..repetition.min {
             builder.append_nfa(builder.end_state_id(), nfa_not_accepting.clone());
         }

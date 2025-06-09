@@ -13,7 +13,7 @@ pub enum TokenPattern {
     },
     Regex {
         pattern: syn::LitStr,
-        transform: syn::Ident,
+        matcher: syn::Ident,
     },
 }
 
@@ -232,22 +232,27 @@ impl TokenPattern {
     fn parse_regex(input: syn::parse::ParseStream) -> syn::Result<TokenPattern> {
         let regex: syn::LitStr = input.parse()?;
         let _comma: syn::Token![,] = input.parse()?;
-        let transform: syn::Path = input.parse()?;
+        let path: syn::Path = input.parse()?;
 
         if !input.is_empty() {
             return Err(syn::Error::new(input.span(), TRAILING_TOKENS_ERR));
         }
 
-        if transform.segments.len() != 1 {
-            let msg = "Transform function must be a single identifier. Make sure the function is accessible in the module's scope";
-            return Err(syn::Error::new(transform.span(), msg));
+        if path.segments.len() != 1 {
+            let msg = "Matcher function must be a single identifier. Make sure the function is accessible in the module's scope";
+            return Err(syn::Error::new(path.span(), msg));
         }
 
-        let transform = transform.segments.first().unwrap().ident.clone();
+        let first_segment = path.segments.first().unwrap();
+
+        if first_segment.arguments != syn::PathArguments::None {
+            let msg = "Matcher function must not have any generics";
+            return Err(syn::Error::new(first_segment.arguments.span(), msg));
+        }
 
         Ok(TokenPattern::Regex {
             pattern: regex,
-            transform,
+            matcher: first_segment.ident.clone(),
         })
     }
 

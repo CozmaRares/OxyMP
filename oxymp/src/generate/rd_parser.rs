@@ -142,7 +142,7 @@ fn generate_one(
 
                 for i in start..end {
                     let display = if i < len {
-                        #_format!("{}", self.input[i])
+                        #_format!("{:?}", self.input[i])
                     } else {
                         "<EOF>".to_string()
                     };

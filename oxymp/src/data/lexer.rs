@@ -90,8 +90,6 @@ impl syn::parse::Parse for ErrorAttr {
             return Err(syn::Error::new(first_segment.arguments.span(), msg));
         }
 
-        let ident = path.segments.first().unwrap().ident.clone();
-
-        Ok(ErrorAttr(ident))
+        Ok(ErrorAttr(first_segment.ident.clone()))
     }
 }

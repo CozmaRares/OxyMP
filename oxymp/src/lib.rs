@@ -138,7 +138,7 @@ use syn::spanned::Spanned;
 ///   two variants:
 ///   * `Native` => the error was caused by the lexer itself when an unexpedted
 ///   character was encountered.
-///   * `UserTransform` => the error was caused by functions defined by the user
+///   * `UserMatcher` => the error was caused by functions defined by the user
 ///   for a `#[regex(...)]` token definition.
 /// * A `tokenize` function that takes a `&str` as input and returns a
 ///   `Result<Vec<Token>, Error>`, where `Token` is the token enum defined with
