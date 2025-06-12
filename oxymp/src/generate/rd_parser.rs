@@ -173,7 +173,6 @@ fn generate_shared_items(tokens_ident: &syn::Ident) -> SharedItems {
             UnexpectedEof,
             UnexpectedToken,
             ChoiceFailed {
-                rule_name: #_String,
                 choice_idx: #_usize,
                 causes: #_Vec<#error_ident>,
             },
@@ -184,8 +183,8 @@ fn generate_shared_items(tokens_ident: &syn::Ident) -> SharedItems {
                 match self {
                     #error_kind_ident::UnexpectedEof => #_write!(f, "Unexpected end of input"),
                     #error_kind_ident::UnexpectedToken => #_write!(f, "Unexpected token"),
-                    #error_kind_ident::ChoiceFailed { rule_name, choice_idx, causes } => {
-                        #_write!(f, "Choice '{}', from rule '{}', failed", choice_idx, rule_name)?;
+                    #error_kind_ident::ChoiceFailed { choice_idx, causes } => {
+                        #_write!(f, "Choice '{}' failed", choice_idx)?;
                         if !causes.is_empty() {
                             #_writeln!(f, " due to:")?;
                             for (i, cause) in causes.iter().enumerate() {
@@ -200,6 +199,7 @@ fn generate_shared_items(tokens_ident: &syn::Ident) -> SharedItems {
 
         #[derive(#_Debug)]
         pub struct #error_ident {
+            rule_name: #_String,
             kind: #error_kind_ident,
             input: #_Rc<[#tokens_ident]>,
             cursor: #_usize,
@@ -209,7 +209,8 @@ fn generate_shared_items(tokens_ident: &syn::Ident) -> SharedItems {
         impl #_Error for #error_ident {}
         impl #_Display for #error_ident {
             fn fmt(&self, f: &mut #_Formatter<'_>) -> #_FmtResult {
-                #_writeln!(f, "Parse error at index {}", self.cursor)?;
+                #_writeln!(f, "Parser failed when matching rule '{}'", self.rule_name)?;
+                #_writeln!(f, "Parse error at token index {}", self.cursor)?;
                 #_writeln!(f, "{}", self.kind)?;
 
                 if !self.expected.is_empty() {
@@ -432,6 +433,7 @@ fn expand_node(
                 let #_Some(_current) = state.peek() else {
                     return #_Err(Error {
                         kind: ErrorKind::UnexpectedEof,
+                        rule_name: #rule_name.to_string(),
                         input: state.input(),
                         cursor: state.cursor,
                         expected: vec![], // TODO:
@@ -440,6 +442,7 @@ fn expand_node(
                 let (state, #node_ident) = match super::#token_struct_entry::try_from_ref(_current) {
                     #_None => return #_Err(Error {
                         kind: ErrorKind::UnexpectedToken,
+                        rule_name: #rule_name.to_string(),
                         input: state.input(),
                         cursor: state.cursor,
                         expected: vec![], // TODO:
@@ -506,10 +509,10 @@ fn expand_node(
 
                     #_Err(Error {
                         kind: ErrorKind::ChoiceFailed {
-                            rule_name: #rule_name.to_string(),
                             choice_idx: #choice_idx,
                             causes: vec![], // TODO:
                         },
+                        rule_name: #rule_name.to_string(),
                         input: state.input(),
                         cursor: state.cursor,
                         expected: vec![], // TODO:
