@@ -48,7 +48,7 @@ mod language {
 use language::*;
 
 fn helper() -> Result<(), Box<dyn std::error::Error>> {
-    let input = "你 ! 1 + 2";
+    let input = "1+2";
 
     let tokens = lexer::tokenize(input)?;
     let (_inp, ast) = rd_parser::E(tokens.into())?;

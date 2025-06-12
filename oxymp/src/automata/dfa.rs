@@ -79,13 +79,7 @@ pub fn compile(nfa: nfa::NFA) -> DFA {
     }
 
     let dfa = builder.build();
-    let dfa = minimize(dfa);
     compress_char_classes(dfa)
-}
-
-// TODO:
-fn minimize(dfa: DFA) -> DFA {
-    dfa
 }
 
 fn compress_char_classes(mut dfa: DFA) -> DFA {

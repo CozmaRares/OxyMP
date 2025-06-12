@@ -521,6 +521,7 @@ fn generate_tokenize_fn() -> proc_macro2::TokenStream {
             let mut toks = #_Vec::new();
             let mut state = State::_1;
             let mut match_start = 0;
+            // TODO: use Vec<char>
             let mut iter = inp.chars().enumerate().peekable();
             let input_length = inp.chars().count();
             let mut char_offset = 0;

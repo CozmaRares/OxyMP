@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
+use quote::format_ident;
 
 use crate::{
     data::{rd_parser::RDParserData, tokens::TokensData},
@@ -16,24 +17,106 @@ pub fn generate(
     tokens_data: &TokensData,
     rd_parsers: Vec<(syn::ItemMod, RDParserData)>,
 ) -> syn::Result<Vec<syn::Item>> {
+    let mut parser_cache = ParserCache::new(&tokens_data.ident);
+
     let items = rd_parsers
         .into_iter()
-        .map(|(item_mod, rd_data)| generate_one(tokens_data, item_mod, rd_data))
+        .map(|(item_mod, rd_data)| generate_one(tokens_data, item_mod, rd_data, &mut parser_cache))
         .collect_errors()?;
-    Ok(items)
+
+    Ok(items.into_iter().flatten().collect())
 }
 
 fn generate_one(
     tokens_data: &TokensData,
     mut item_mod: syn::ItemMod,
     rd_data: RDParserData,
-) -> syn::Result<syn::Item> {
+    parser_cache: &mut ParserCache,
+) -> syn::Result<Vec<syn::Item>> {
+    let tokens_ident = &tokens_data.ident;
+
     let rules = parse_grammar(tokens_data, rd_data.grammar_rules)?;
 
     let parse_tree = generate_parse_tree(&tokens_data.ident, &rules);
     let parser = generate_parser(&rules, &tokens_data.ident);
 
-    let tokens_ident = &tokens_data.ident;
+    let (shared_idents, mut items) = parser_cache.get_shared_idents();
+
+    let SharedIdents {
+        state_ident,
+        error_kind_ident,
+        error_ident,
+        result_ident,
+    } = shared_idents;
+
+    let parser_items = items! {
+        type Token = super::#tokens_ident;
+        pub type State = super::#state_ident;
+        pub type ErrorKind = super::#error_kind_ident;
+        pub type Error = super::#error_ident;
+        pub type Result<T> = super::#result_ident<T>;
+
+        #parse_tree
+        #parser
+    };
+
+    let (brace, _) = item_mod.content.expect("module should have content");
+    item_mod.content = Some((brace, parser_items));
+    items.push(syn::Item::Mod(item_mod));
+    Ok(items)
+}
+
+struct ParserCache<'a> {
+    tokens_ident: &'a syn::Ident,
+    shared_idents: Option<SharedIdents>,
+}
+
+impl ParserCache<'_> {
+    fn new(tokens_ident: &syn::Ident) -> ParserCache {
+        ParserCache {
+            tokens_ident,
+            shared_idents: None,
+        }
+    }
+
+    fn get_shared_idents(&mut self) -> (&SharedIdents, Vec<syn::Item>) {
+        let mut items = Vec::new();
+
+        if self.shared_idents.is_none() {
+            let SharedItems {
+                idents: shared_idents,
+                items: shared_items,
+            } = generate_shared_items(self.tokens_ident);
+            items.extend(shared_items);
+            self.shared_idents = Some(shared_idents);
+        }
+
+        (
+            self.shared_idents
+                .as_ref()
+                .expect("error idents should be set"),
+            items,
+        )
+    }
+}
+
+struct SharedIdents {
+    state_ident: syn::Ident,
+    error_kind_ident: syn::Ident,
+    error_ident: syn::Ident,
+    result_ident: syn::Ident,
+}
+
+struct SharedItems {
+    idents: SharedIdents,
+    items: Vec<syn::Item>,
+}
+
+fn generate_shared_items(tokens_ident: &syn::Ident) -> SharedItems {
+    let state_ident = format_ident!("__oxymp_helper_RD_State_{}", rand::random::<u64>());
+    let error_kind_ident = format_ident!("__oxymp_helper_RD_ErrorKind_{}", rand::random::<u64>());
+    let error_ident = format_ident!("__oxymp_helper_RD_Error_{}", rand::random::<u64>());
+    let result_ident = format_ident!("__oxymp_helper_RD_Result_{}", rand::random::<u64>());
 
     let _Rc = Std::Rc.path();
     let _usize = Core::Usize.path();
@@ -54,24 +137,22 @@ fn generate_one(
     let _Clone = Derive::Clone.path();
     let _format = Macro::Format.path();
 
-    let parser_items = items! {
-        type Token = super::#tokens_ident;
-
+    let items = items! {
         #[derive(#_Debug, #_Clone)]
-        pub struct Input {
-            inp: #_Rc<[Token]>,
+        pub struct #state_ident {
+            inp: #_Rc<[#tokens_ident]>,
             cursor: #_usize,
         }
-        impl #_From<#_Vec<Token>> for Input {
-            fn from(value: #_Vec<Token>) -> Self {
+        impl #_From<#_Vec<#tokens_ident>> for #state_ident {
+            fn from(value: #_Vec<#tokens_ident>) -> Self {
                 Self {
                     inp: value.into(),
                     cursor: 0,
                 }
             }
         }
-        impl Input {
-            fn peek(&self) -> #_Option<&Token> {
+        impl #state_ident {
+            fn peek(&self) -> #_Option<&#tokens_ident> {
                 self.inp.get(self.cursor)
             }
 
@@ -82,28 +163,28 @@ fn generate_one(
                 }
             }
 
-            fn input(&self) -> #_Rc<[Token]> {
+            fn input(&self) -> #_Rc<[#tokens_ident]> {
                 self.inp.clone()
             }
         }
 
         #[derive(#_Debug)]
-        pub enum ErrorKind {
+        pub enum #error_kind_ident {
             UnexpectedEof,
             UnexpectedToken,
             ChoiceFailed {
                 rule_name: #_String,
                 choice_idx: #_usize,
-                causes: #_Vec<Error>,
+                causes: #_Vec<#error_ident>,
             },
         }
 
-        impl #_Display for ErrorKind {
+        impl #_Display for #error_kind_ident {
             fn fmt(&self, f: &mut #_Formatter<'_>) -> #_FmtResult {
                 match self {
-                    ErrorKind::UnexpectedEof => #_write!(f, "Unexpected end of input"),
-                    ErrorKind::UnexpectedToken => #_write!(f, "Unexpected token"),
-                    ErrorKind::ChoiceFailed { rule_name, choice_idx, causes } => {
+                    #error_kind_ident::UnexpectedEof => #_write!(f, "Unexpected end of input"),
+                    #error_kind_ident::UnexpectedToken => #_write!(f, "Unexpected token"),
+                    #error_kind_ident::ChoiceFailed { rule_name, choice_idx, causes } => {
                         #_write!(f, "Choice '{}', from rule '{}', failed", choice_idx, rule_name)?;
                         if !causes.is_empty() {
                             #_writeln!(f, " due to:")?;
@@ -118,15 +199,15 @@ fn generate_one(
         }
 
         #[derive(#_Debug)]
-        pub struct Error {
-            kind: ErrorKind,
-            input: #_Rc<[Token]>,
+        pub struct #error_ident {
+            kind: #error_kind_ident,
+            input: #_Rc<[#tokens_ident]>,
             cursor: #_usize,
             expected: #_Vec<#_String>,
         }
 
-        impl #_Error for Error {}
-        impl #_Display for Error {
+        impl #_Error for #error_ident {}
+        impl #_Display for #error_ident {
             fn fmt(&self, f: &mut #_Formatter<'_>) -> #_FmtResult {
                 #_writeln!(f, "Parse error at index {}", self.cursor)?;
                 #_writeln!(f, "{}", self.kind)?;
@@ -153,15 +234,18 @@ fn generate_one(
             }
         }
 
-        pub type State<T> = #_Result<(Input, T), Error>;
-
-        #parse_tree
-        #parser
+        pub type #result_ident<T> = #_Result<(#state_ident, T), #error_ident>;
     };
 
-    let (brace, _) = item_mod.content.expect("module should have content");
-    item_mod.content = Some((brace, parser_items));
-    Ok(syn::Item::Mod(item_mod))
+    SharedItems {
+        idents: SharedIdents {
+            state_ident,
+            error_kind_ident,
+            error_ident,
+            result_ident,
+        },
+        items,
+    }
 }
 
 fn generate_parse_tree(tokens_ident: &syn::Ident, rules: &[GrammarRule]) -> TokenStream {
@@ -301,10 +385,10 @@ fn generate_method(
     let _Ok = Std::Ok.path();
 
     q! {
-        pub fn #rule_ident<'a>(inp: Input) -> State<#rule_ident> {
+        pub fn #rule_ident<'a>(state: State) -> Result<#rule_ident> {
             #toks
             #_Ok((
-                inp,
+                state,
                 #rule_ident { value: #ident }
             ))
         }
@@ -336,8 +420,8 @@ fn expand_node(
 
             q! {
                 //#check
-                let (inp, #node_ident) =
-                    #rule_ident(inp)
+                let (state, #node_ident) =
+                    #rule_ident(state)
                         .map(|(remaining, ast)| (remaining, #_Box::new(ast)))?;
             }
         }
@@ -345,22 +429,22 @@ fn expand_node(
             let token_struct_entry = idents::token_struct(tokens_ident, token);
 
             q! {
-                let #_Some(_current) = inp.peek() else {
+                let #_Some(_current) = state.peek() else {
                     return #_Err(Error {
                         kind: ErrorKind::UnexpectedEof,
-                        input: inp.input(),
-                        cursor: inp.cursor,
+                        input: state.input(),
+                        cursor: state.cursor,
                         expected: vec![], // TODO:
                     });
                 };
-                let (inp, #node_ident) = match super::#token_struct_entry::try_from_ref(_current) {
+                let (state, #node_ident) = match super::#token_struct_entry::try_from_ref(_current) {
                     #_None => return #_Err(Error {
                         kind: ErrorKind::UnexpectedToken,
-                        input: inp.input(),
-                        cursor: inp.cursor,
+                        input: state.input(),
+                        cursor: state.cursor,
                         expected: vec![], // TODO:
                     }),
-                    #_Some(t) => (inp.advance(), t),
+                    #_Some(t) => (state.advance(), t),
                 };
             }
         }
@@ -376,11 +460,11 @@ fn expand_node(
 
             q! {
                 //#check
-                let (inp, #node_ident) = (|| {
+                let (state, #node_ident) = (|| {
                      #(#toks)*
 
                     #_Ok((
-                        inp,
+                        state,
                         ( #(#idents),* )
                     ))
                 })()?;
@@ -401,13 +485,13 @@ fn expand_node(
                     let choice_ident = idents::choice_enum(rule_name, *choice_idx);
 
                     q! {
-                        let r: State<_> = (|| {
-                            let inp = inp.clone();
+                        let r: Result<_> = (|| {
+                            let state = state.clone();
                             #toks
-                            #_Ok((inp, #ident))
+                            #_Ok((state, #ident))
                         })();
-                        if let #_Ok((inp, ast)) = r {
-                            return #_Ok((inp, #choice_ident::#idx_ident(ast)));
+                        if let #_Ok((state, ast)) = r {
+                            return #_Ok((state, #choice_ident::#idx_ident(ast)));
                         };
                     }
                 });
@@ -417,7 +501,7 @@ fn expand_node(
 
             q! {
                 //#check
-                let (inp, #node_ident) =  (|| {
+                let (state, #node_ident) =  (|| {
                     #(#defs)*
 
                     #_Err(Error {
@@ -426,8 +510,8 @@ fn expand_node(
                             choice_idx: #choice_idx,
                             causes: vec![], // TODO:
                         },
-                        input: inp.input(),
-                        cursor: inp.cursor,
+                        input: state.input(),
+                        cursor: state.cursor,
                         expected: vec![], // TODO:
                     })
                 })()?;
@@ -440,15 +524,15 @@ fn expand_node(
             //let check = generate_token_check(rule, &dir_set, data.simple_types, needs_check);
 
             q! {
-                let res: State<_> = (|| {
+                let res: Result<_> = (|| {
                     //#check
-                    let inp = inp.clone();
+                    let state = state.clone();
                     #toks
-                    #_Ok((inp, #ident))
+                    #_Ok((state, #ident))
                 })();
-                let (inp, #node_ident) =  match res {
-                    #_Ok((new_inp, ast)) => (new_inp, #_Some(ast)),
-                    #_Err(_) => (inp, #_None),
+                let (state, #node_ident) =  match res {
+                    #_Ok((new_state, ast)) => (new_state, #_Some(ast)),
+                    #_Err(_) => (state, #_None),
                 };
             }
         }
